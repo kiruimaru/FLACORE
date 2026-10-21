@@ -1,7 +1,13 @@
 # Исходные файлы
 set(SOURCES
     main.cpp
-    # Позже добавите больше файлов
+    core/player/Playlist.cpp
+    ui/MainWindow.cpp
+)
+
+set(HEADERS
+    core/player/Playlist.h
+    ui/MainWindow.h
 )
 
 # Создать исполняемый файл
