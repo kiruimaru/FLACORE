@@ -1,0 +1,4 @@
+flacore_autogen/timestamp: \
+	/home/kiruimaru/Projects/FLACORE/src/CMakeLists.txt \
+	/home/kiruimaru/Projects/FLACORE/src/main.cpp \
+	/usr/bin/cmake
