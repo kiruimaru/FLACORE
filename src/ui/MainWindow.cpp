@@ -1,4 +1,7 @@
 #include "MainWindow.h"
+#include "YouTubePanel.h"
+#include "YtDlpSettingsDialog.h"
+#include "core/ytdlp/YtDlp.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFileDialog>
@@ -7,8 +10,14 @@
 #include <QMenu>
 #include <QAction>
 #include <QSplitter>
+#include <QTabWidget>
+#include <QStatusBar>
 #include <QDir>
+#include <QFileInfo>
 #include <QDebug>
+#include <QSettings>
+#include <QDesktopServices>
+#include <QUrl>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent) {
@@ -19,6 +28,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     playlist = new Playlist(this);
 
+    ytdlp = new YtDlp(this);
+
     setupUI();
     createMenuBar();
 
@@ -27,6 +38,27 @@ MainWindow::MainWindow(QWidget *parent)
     connect(player, &QMediaPlayer::durationChanged, this, &MainWindow::onDurationChanged);
     connect(playlist, &Playlist::trackAdded, this, &MainWindow::onPlaylistTrackAdded);
     connect(playlist, &Playlist::currentTrackChanged, this, &MainWindow::onCurrentTrackChanged);
+
+    // yt-dlp: играем скачанное и складываем в плейлист
+    connect(youtubePanel, &YouTubePanel::playRequested, this, &MainWindow::playFile);
+    connect(youtubePanel, &YouTubePanel::fileAdded, this, [this](const QString &path) {
+        for (int i = 0; i < playlist->count(); ++i) {
+            if (playlist->getTrackPath(i) == path) {
+                statusBar()->showMessage(tr("Уже в плейлисте: %1").arg(QFileInfo(path).fileName()), 5000);
+                return;
+            }
+        }
+        playlist->addTrack(path);
+        updateButtonStates();
+        statusBar()->showMessage(tr("Добавлено в плейлист: %1").arg(QFileInfo(path).fileName()), 5000);
+    });
+
+    connect(ytdlp, &YtDlp::availabilityChecked, this, [this](bool available, const QString &info) {
+        statusBar()->showMessage(available ? tr("yt-dlp %1 — готов").arg(info)
+                                           : tr("yt-dlp недоступен: %1").arg(info),
+                                 8000);
+    });
+    ytdlp->checkAvailability();
 }
 
 MainWindow::~MainWindow() {}
@@ -35,8 +67,8 @@ void MainWindow::setupUI() {
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
-    setWindowTitle("FLACORE Music Player v0.2");
-    resize(900, 600);
+    setWindowTitle("FLACORE Music Player v0.3");
+    resize(1000, 640);
 
     // Main layout - horizontal splitter
     QSplitter *splitter = new QSplitter(Qt::Horizontal, centralWidget);
@@ -130,18 +162,14 @@ void MainWindow::setupUI() {
 
     leftLayout->addStretch();
 
-    // Right panel - Playlist
+    // Right panel - tabs: playlist / YouTube
     QWidget *rightPanel = new QWidget();
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
 
-    QLabel *playlistLabel = new QLabel("Playlist");
-    playlistLabel->setStyleSheet("font-size: 16px; font-weight: bold;");
-    rightLayout->addWidget(playlistLabel);
-
     playlistWidget = new QListWidget();
+    playlistWidget->setObjectName(QStringLiteral("playlistWidget"));
     playlistWidget->setSelectionMode(QAbstractItemView::SingleSelection);
     connect(playlistWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onTrackDoubleClicked);
-    rightLayout->addWidget(playlistWidget);
 
     // Playlist buttons
     QHBoxLayout *playlistButtonLayout = new QHBoxLayout();
@@ -151,7 +179,19 @@ void MainWindow::setupUI() {
     connect(clearPlaylistButton, &QPushButton::clicked, this, &MainWindow::onClearPlaylist);
     playlistButtonLayout->addWidget(removeTrackButton);
     playlistButtonLayout->addWidget(clearPlaylistButton);
-    rightLayout->addLayout(playlistButtonLayout);
+
+    QWidget *playlistTab = new QWidget();
+    QVBoxLayout *playlistTabLayout = new QVBoxLayout(playlistTab);
+    playlistTabLayout->setContentsMargins(4, 4, 4, 4);
+    playlistTabLayout->addWidget(playlistWidget, 1);
+    playlistTabLayout->addLayout(playlistButtonLayout);
+
+    youtubePanel = new YouTubePanel(ytdlp, this);
+
+    QTabWidget *rightTabs = new QTabWidget();
+    rightTabs->addTab(playlistTab, "Playlist");
+    rightTabs->addTab(youtubePanel, "YouTube");
+    rightLayout->addWidget(rightTabs);
 
     // Add panels to splitter
     splitter->addWidget(leftPanel);
@@ -172,6 +212,19 @@ void MainWindow::createMenuBar() {
     quitAction->setShortcut(QKeySequence::Quit);
     connect(quitAction, &QAction::triggered, this, &QMainWindow::close);
     fileMenu->addAction(quitAction);
+
+    // yt-dlp
+    QMenu *toolsMenu = menuBar()->addMenu(tr("Инструменты"));
+
+    QAction *openYtDlpSettings = new QAction(tr("Настройки yt-dlp…"), this);
+    connect(openYtDlpSettings, &QAction::triggered, this, &MainWindow::onYtDlpSettings);
+    toolsMenu->addAction(openYtDlpSettings);
+
+    QAction *openLibrary = new QAction(tr("Открыть папку библиотеки"), this);
+    connect(openLibrary, &QAction::triggered, this, []() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(YtDlp::libraryDir()));
+    });
+    toolsMenu->addAction(openLibrary);
 }
 
 void MainWindow::onOpenFiles() {
@@ -296,4 +349,47 @@ void MainWindow::updateButtonStates() {
     stopButton->setEnabled(hasItems);
     nextButton->setEnabled(playlist->hasNext());
     previousButton->setEnabled(playlist->hasPrevious());
+}
+
+// Загружает локальный файл (в т.ч. скачанный yt-dlp) и сразу включает его.
+void MainWindow::playFile(const QString &path) {
+    if (path.isEmpty())
+        return;
+
+    int index = -1;
+    for (int i = 0; i < playlist->count(); ++i) {
+        if (playlist->getTrackPath(i) == path) {
+            index = i;
+            break;
+        }
+    }
+    if (index < 0) {
+        playlist->addTrack(path);
+        index = playlist->count() - 1;
+    }
+
+    playlist->setCurrentIndex(index);
+    loadTrack(index);
+    player->play();
+
+    playButton->setEnabled(false);
+    pauseButton->setEnabled(true);
+    progressSlider->setValue(0);
+}
+
+void MainWindow::onYtDlpSettings() {
+    YtDlpSettingsDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    QSettings settings;
+    settings.setValue("ytdlp/binary", dialog.binaryPath());
+    settings.setValue("ytdlp/ffmpegDir", dialog.ffmpegDir());
+    settings.setValue("ytdlp/libraryDir", dialog.libraryDir());
+    settings.setValue("ytdlp/audioFormat", dialog.audioFormat());
+    settings.sync();
+
+    ytdlp->setBinary(dialog.binaryPath());
+    ytdlp->checkAvailability();
+    statusBar()->showMessage(tr("Настройки yt-dlp сохранены"), 4000);
 }

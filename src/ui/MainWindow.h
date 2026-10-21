@@ -8,7 +8,10 @@
 #include <QSlider>
 #include <QLabel>
 #include <QListWidget>
-#include "../core/player/Playlist.h"
+#include "core/player/Playlist.h"
+
+class YtDlp;
+class YouTubePanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -33,17 +36,21 @@ private slots:
     void onSeek(int position);
     void onPlaylistTrackAdded(int index);
     void onCurrentTrackChanged(int index);
+    void onYtDlpSettings();
 
 private:
     void setupUI();
     void createMenuBar();
     void loadTrack(int index);
     void updateButtonStates();
+    void playFile(const QString &path);
 
     // Media
     QMediaPlayer *player;
     QAudioOutput *audioOutput;
     Playlist *playlist;
+    YtDlp *ytdlp;
+    YouTubePanel *youtubePanel;
 
     // UI Components
     QWidget *centralWidget;
