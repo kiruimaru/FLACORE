@@ -59,9 +59,9 @@ ui_*.h
 # Dependency files
 *.d
 
-# Core dumps
-core
-core.*
+# Core dumps (только в корне: иначе правило съедает src/core/)
+/core
+core.[0-9]*
 
 # Debug symbols
 *.dSYM/
