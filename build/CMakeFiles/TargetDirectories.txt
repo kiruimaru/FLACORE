@@ -1,2 +1,0 @@
-/home/kiruimaru/Projects/FLACORE/build/CMakeFiles/edit_cache.dir
-/home/kiruimaru/Projects/FLACORE/build/CMakeFiles/rebuild_cache.dir
