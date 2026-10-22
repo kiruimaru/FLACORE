@@ -2,8 +2,8 @@
 
 #include "core/ytdlp/YtDlp.h"
 
-#include <QColor>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -13,6 +13,9 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
+#include <QStyle>
+#include <QSize>
+#include <QSizePolicy>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -63,25 +66,34 @@ YouTubePanel::YouTubePanel(YtDlp *ytdlp, QWidget *parent)
         setStatus(status);
     });
 
-    connect(m_ytdlp, &YtDlp::downloadFinished, this, [this](const QString &filePath) {
+    connect(m_ytdlp, &YtDlp::downloadFilesFinished, this,
+            [this](const QStringList &filePaths) {
         const Job job = m_job;
         m_job = Job::None;
         m_progress->setRange(0, 100);
         m_progress->setValue(100);
 
-        if (!QFileInfo::exists(filePath)) {
-            setError(tr("Файл не найден после скачивания: %1").arg(filePath));
+        QStringList existing;
+        for (const QString &path : filePaths) {
+            if (QFileInfo::exists(path))
+                existing.append(path);
+        }
+        if (existing.isEmpty()) {
+            setError(tr("Скачанные файлы не найдены"));
             updateUi();
             return;
         }
 
-        const QString name = QFileInfo(filePath).completeBaseName();
         if (job == Job::SaveToLibrary) {
-            setStatus(tr("Сохранено: %1").arg(name));
-            emit fileAdded(filePath);
+            setStatus(tr("Добавлено в библиотеку: %1 файлов").arg(existing.size()));
+            if (existing.size() == 1)
+                emit fileAdded(existing.first());
+            else
+                emit filesAdded(existing);
         } else {
-            setStatus(tr("Играю: %1").arg(name));
-            emit playRequested(filePath);
+            const QString path = existing.first();
+            setStatus(tr("Играю: %1").arg(QFileInfo(path).completeBaseName()));
+            emit playRequested(path);
         }
         updateUi();
     });
@@ -119,10 +131,15 @@ YouTubePanel::YouTubePanel(YtDlp *ytdlp, QWidget *parent)
 void YouTubePanel::setupUi()
 {
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
-    layout->setSpacing(6);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+
+    auto *heading = new QLabel(tr("НАЙТИ МУЗЫКУ"), this);
+    heading->setObjectName(QStringLiteral("eyebrowLabel"));
+    layout->addWidget(heading);
 
     auto *searchRow = new QHBoxLayout();
+    searchRow->setSpacing(7);
     m_sourceCombo = new QComboBox(this);
     m_sourceCombo->setObjectName(QStringLiteral("ytSourceCombo"));
     m_sourceCombo->addItem(tr("YouTube"), int(YtDlp::Provider::YouTube));
@@ -131,6 +148,8 @@ void YouTubePanel::setupUi()
     m_searchEdit->setObjectName(QStringLiteral("ytSearchEdit"));
     m_searchEdit->setPlaceholderText(tr("Поиск или ссылка (YouTube, SoundCloud, …)"));
     m_searchEdit->setClearButtonEnabled(true);
+    m_searchEdit->setMinimumWidth(100);
+    m_searchEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_searchButton = new QPushButton(tr("Найти"), this);
     m_searchButton->setObjectName(QStringLiteral("ytSearchButton"));
     m_searchButton->setDefault(true);
@@ -142,11 +161,14 @@ void YouTubePanel::setupUi()
     m_results = new QListWidget(this);
     m_results->setObjectName(QStringLiteral("ytResults"));
     m_results->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_results->setAlternatingRowColors(true);
+    m_results->setAlternatingRowColors(false);
     m_results->setWordWrap(true);
+    m_results->setSpacing(2);
+    m_results->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     layout->addWidget(m_results, 1);
 
     auto *actionsRow = new QHBoxLayout();
+    actionsRow->setSpacing(7);
     m_playButton = new QPushButton(tr("Слушать"), this);
     m_playButton->setObjectName(QStringLiteral("ytPlayButton"));
     m_playButton->setToolTip(tr("Скачать во временный кэш и сразу включить"));
@@ -158,6 +180,9 @@ void YouTubePanel::setupUi()
     m_cancelButton->setEnabled(false);
     actionsRow->addWidget(m_playButton);
     actionsRow->addWidget(m_saveButton);
+    m_playlistCheck = new QCheckBox(tr("Плейлист целиком"), this);
+    m_playlistCheck->setToolTip(tr("Скачать URL плейлиста целиком в библиотеку"));
+    actionsRow->addWidget(m_playlistCheck);
     actionsRow->addStretch();
     actionsRow->addWidget(m_cancelButton);
     layout->addLayout(actionsRow);
@@ -166,19 +191,20 @@ void YouTubePanel::setupUi()
     m_progress->setObjectName(QStringLiteral("ytProgress"));
     m_progress->setRange(0, 100);
     m_progress->setValue(0);
-    m_progress->setTextVisible(true);
+    m_progress->setTextVisible(false);
     layout->addWidget(m_progress);
 
     m_status = new QLabel(this);
     m_status->setObjectName(QStringLiteral("ytStatus"));
     m_status->setWordWrap(true);
-    m_status->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    m_status->setProperty("error", false);
     layout->addWidget(m_status);
 
     connect(m_searchButton, &QPushButton::clicked, this, &YouTubePanel::runSearch);
     connect(m_searchEdit, &QLineEdit::returnPressed, this, &YouTubePanel::runSearch);
     connect(m_searchEdit, &QLineEdit::textChanged, this, [this]() { updateUi(); });
     connect(m_sourceCombo, &QComboBox::currentIndexChanged, this, [this]() { updateUi(); });
+    connect(m_playlistCheck, &QCheckBox::toggled, this, [this]() { updateUi(); });
     connect(m_playButton, &QPushButton::clicked, this, [this]() { startJob(Job::PlayNow); });
     connect(m_saveButton, &QPushButton::clicked, this, [this]() { startJob(Job::SaveToLibrary); });
     connect(m_cancelButton, &QPushButton::clicked, m_ytdlp, &YtDlp::cancel);
@@ -211,8 +237,19 @@ void YouTubePanel::startJob(Job job)
 {
     QString url;
     QString title;
-    if (!selectedTarget(&url, &title))
+    const bool wholePlaylist = m_playlistCheck->isChecked()
+                               && job == Job::SaveToLibrary;
+    if (wholePlaylist) {
+        url = m_searchEdit->text().trimmed();
+        title = tr("плейлист");
+        if (!url.startsWith(QLatin1String("http://"), Qt::CaseInsensitive)
+            && !url.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)) {
+            setError(tr("Для загрузки плейлиста вставьте ссылку в поле поиска"));
+            return;
+        }
+    } else if (!selectedTarget(&url, &title)) {
         return;
+    }
 
     if (YtDlp::resolveBinary().isEmpty()) {
         setError(tr("yt-dlp не найден. Укажите путь в «Инструменты → Настройки yt-dlp»."));
@@ -227,7 +264,7 @@ void YouTubePanel::startJob(Job job)
         const QString format = QSettings().value(QStringLiteral("ytdlp/audioFormat"),
                                                  QStringLiteral("flac")).toString();
         setStatus(tr("Скачиваю в библиотеку (%1): %2").arg(format, title));
-        m_ytdlp->download(url, YtDlp::libraryDir(), format);
+        m_ytdlp->download(url, YtDlp::libraryDir(), format, true, wholePlaylist);
     } else {
         setStatus(tr("Загружаю для прослушивания: %1").arg(title));
         m_ytdlp->download(url, YtDlp::cacheDir(), QString());
@@ -245,7 +282,13 @@ void YouTubePanel::updateUi()
     m_searchButton->setEnabled(!busy && !m_searchEdit->text().trimmed().isEmpty());
     m_results->setEnabled(!busy);
     m_playButton->setEnabled(!busy && hasSelection);
-    m_saveButton->setEnabled(!busy && hasSelection);
+    const QUrl playlistUrl(m_searchEdit->text().trimmed());
+    const bool canSavePlaylist = m_playlistCheck->isChecked()
+                                 && (playlistUrl.scheme() == QLatin1String("http")
+                                     || playlistUrl.scheme() == QLatin1String("https"))
+                                 && !playlistUrl.host().isEmpty();
+    m_saveButton->setEnabled(!busy && (hasSelection || canSavePlaylist));
+    m_playlistCheck->setEnabled(!busy);
     m_cancelButton->setEnabled(busy && m_ytdlp->mode() == YtDlp::Mode::Downloading);
 
     if (!busy && m_progress->maximum() == 0)
@@ -255,13 +298,17 @@ void YouTubePanel::updateUi()
 void YouTubePanel::setStatus(const QString &text)
 {
     m_status->setText(text);
-    m_status->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    m_status->setProperty("error", false);
+    m_status->style()->unpolish(m_status);
+    m_status->style()->polish(m_status);
 }
 
 void YouTubePanel::setError(const QString &text)
 {
     m_status->setText(text);
-    m_status->setStyleSheet(QStringLiteral("color: #ff6b6b;"));
+    m_status->setProperty("error", true);
+    m_status->style()->unpolish(m_status);
+    m_status->style()->polish(m_status);
 }
 
 bool YouTubePanel::selectedTarget(QString *url, QString *title) const
@@ -288,7 +335,9 @@ void YouTubePanel::addResultItem(const YtDlpResult &result)
     item->setData(kUrlRole, result.webpageUrl);
     item->setData(kTitleRole, result.title);
     item->setToolTip(result.webpageUrl);
+    item->setSizeHint(QSize(0, 48));
 
     if (!result.durationSec)
-        item->setForeground(QColor(0xa0, 0xa0, 0xa0)); // live/неизвестная длительность
+        item->setToolTip(tr("Прямой эфир или неизвестная длительность\n%1")
+                             .arg(result.webpageUrl));
 }

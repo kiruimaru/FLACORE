@@ -79,7 +79,8 @@ public:
      *                     (нужен бинарник ffmpeg и метаданные).
      */
     void download(const QString &url, const QString &outputDir,
-                  const QString &audioFormat = QString(), bool embedMetadata = true);
+                  const QString &audioFormat = QString(), bool embedMetadata = true,
+                  bool includePlaylist = false);
 
     /** Прерывает текущую операцию; придёт сигнал cancelled(). */
     void cancel();
@@ -93,6 +94,7 @@ signals:
                           qint64 downloadedBytes, qint64 totalBytes);
     void downloadStatus(const QString &status);
     void downloadFinished(const QString &filePath);
+    void downloadFilesFinished(const QStringList &filePaths);
     void downloadFailed(const QString &error);
 
     void cancelled();
@@ -115,6 +117,7 @@ private:
     QString m_stdoutBuffer;
     QString m_stderrTail;
     QString m_lastFilePath;
+    QStringList m_downloadedFiles;
     bool m_cancelRequested = false;
 };
 

@@ -145,7 +145,8 @@ void YtDlp::search(const QString &query, int limit, Provider provider)
 }
 
 void YtDlp::download(const QString &url, const QString &outputDir,
-                     const QString &audioFormat, bool embedMetadata)
+                     const QString &audioFormat, bool embedMetadata,
+                     bool includePlaylist)
 {
     if (url.trimmed().isEmpty() || isBusy())
         return;
@@ -170,7 +171,8 @@ void YtDlp::download(const QString &url, const QString &outputDir,
             args << QStringLiteral("--ffmpeg-location") << ffmpegDir;
     }
 
-    args << QStringLiteral("--no-playlist")
+    args << (includePlaylist ? QStringLiteral("--yes-playlist")
+                             : QStringLiteral("--no-playlist"))
          << QStringLiteral("--newline")
          << QStringLiteral("--no-warnings")
          << QStringLiteral("--progress")                      // --print сам по себе глушит прогресс
@@ -184,6 +186,7 @@ void YtDlp::download(const QString &url, const QString &outputDir,
     args << url.trimmed();
 
     m_mode = Mode::Downloading;
+    m_downloadedFiles.clear();
     startProcess(args);
 }
 
@@ -209,6 +212,7 @@ void YtDlp::startProcess(const QStringList &args)
     m_stdoutBuffer.clear();
     m_stderrTail.clear();
     m_lastFilePath.clear();
+    m_downloadedFiles.clear();
     m_cancelRequested = false;
 
     m_process = new QProcess(this);
@@ -291,6 +295,8 @@ void YtDlp::handleLine(const QString &line)
                               done, qMax<qint64>(0, total));
     } else if (line.startsWith(kFileMarker)) {
         m_lastFilePath = line.mid(kFileMarker.size()).trimmed();
+        if (!m_lastFilePath.isEmpty() && !m_downloadedFiles.contains(m_lastFilePath))
+            m_downloadedFiles.append(m_lastFilePath);
     } else {
         emit downloadStatus(line);
     }
@@ -369,6 +375,9 @@ void YtDlp::onFinished(int exitCode, int exitStatus)
             break;
         }
         emit downloadFinished(m_lastFilePath);
+        emit downloadFilesFinished(m_downloadedFiles.isEmpty()
+                                       ? QStringList{m_lastFilePath}
+                                       : m_downloadedFiles);
         break;
     }
     case Mode::Idle:

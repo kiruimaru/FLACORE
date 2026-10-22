@@ -1,0 +1,88 @@
+name: Build and release
+
+on:
+  push:
+    branches: [feature/ui-redesign]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+          - os: windows-2022
+            platform: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.8.3
+          modules: qtmultimedia
+          cache: true
+      - name: Clear stale CMake build cache
+        run: cmake -E rm -rf build
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFLACORE_BUILD_TESTS=ON
+      - name: Build and test
+        run: |
+          cmake --build build --config Release --parallel
+          ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package Windows
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $exe = (Get-ChildItem build -Recurse -Filter flacore.exe |
+            Where-Object { $_.FullName -match '[\\/]Release[\\/]' } |
+            Select-Object -First 1).FullName
+          if (-not $exe) { throw "flacore.exe was not produced" }
+          windeployqt --release --compiler-runtime "$exe"
+          Compress-Archive -Path (Split-Path $exe) -DestinationPath "FLACORE-windows-x64.zip"
+
+      - name: Package Linux AppImage
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          cmake --install build --prefix "$PWD/AppDir/usr"
+          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/scalable/apps
+          cp packaging/linux/flacore.desktop AppDir/usr/share/applications/
+          cp packaging/linux/flacore.svg AppDir/usr/share/icons/hicolor/scalable/apps/
+          curl -L --fail -o linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          curl -L --fail -o linuxdeploy-plugin-qt-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          mv linuxdeploy-plugin-qt-x86_64.AppImage linuxdeploy-plugin-qt
+          export PATH="$PWD:$PATH"
+          QMAKE="$(command -v qmake6 || command -v qmake)"
+          QMAKE="$QMAKE" ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+          mv FLACORE-*.AppImage FLACORE-linux-x86_64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FLACORE-${{ matrix.platform }}-x64
+          path: ${{ matrix.platform == 'windows' && 'FLACORE-windows-x64.zip' || 'FLACORE-linux-x86_64.AppImage' }}
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*

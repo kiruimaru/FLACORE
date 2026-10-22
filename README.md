@@ -25,10 +25,41 @@ listen immediately, or save to a FLAC library, all inside the same window.
 **Status:** 0.3.0 — early, actively breaking. Read [Known limitations](#known-limitations)
 before expecting it to behave like foobar2000.
 
+## Quick start
+
+Clone FLACORE, build it, and add it to your applications menu:
+
+```bash
+sudo pacman -S --needed base-devel cmake desktop-file-utils qt6-base \
+                       qt6-multimedia qt6-multimedia-ffmpeg yt-dlp ffmpeg
+
+git clone https://github.com/kiruimaru/FLACORE.git
+cd FLACORE
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build build -j"$(nproc)"
+cmake --install build
+update-desktop-database "$HOME/.local/share/applications"
+```
+
+Press `Super+Alt+Space`, search for **FLACORE**, and press Enter. In Omarchy,
+`Super+Space` opens the main menu; `Super+Alt+Space` opens the Apps menu.
+
+- **Play local music:** choose `File → Open Files`, then double-click a playlist
+  track. The next track starts automatically when it finishes.
+- **Search online:** open the `YouTube` tab, search for a track, then choose
+  **Listen** to play it or **To library** to save it.
+- **Launch from a terminal:** run `flacore`.
+
+`yt-dlp` is needed for online search and downloads. `ffmpeg` is used when saving
+audio in a selected format. For other Linux distributions and Windows, see
+[Build](#build).
+
 ---
 
 ## Table of contents
 
+- [Quick start](#quick-start)
 - [Features](#features)
 - [Screenshots](#screenshots)
 - [Requirements](#requirements)
@@ -54,7 +85,8 @@ before expecting it to behave like foobar2000.
 
 - FLAC, MP3, WAV, OGG, M4A, AAC through Qt Multimedia
 - Multi-file open dialog, playlist in the right panel
-- Play / pause / stop / next / previous, drag-to-seek, volume
+- Play / pause / stop / next / previous, automatic next-track playback,
+  drag-to-seek, volume
 - Double-click a playlist row to play it
 
 ### Online (yt-dlp)
@@ -339,12 +371,13 @@ FLACORE/
 │       ├── MainWindow.*          # transport, playlist, tabs, menus
 │       ├── YouTubePanel.*        # search UI, progress, play/save buttons
 │       └── YtDlpSettingsDialog.* # binary paths, library, format
+├── packaging/
+│   └── linux/flacore.desktop    # Linux applications-menu entry
 ├── tests/
 │   ├── fake_ytdlp.cpp            # stub with the same CLI contract
 │   ├── ytdlp_test.cpp            # 39 assertions, no network
 │   └── CMakeLists.txt
 ├── LICENSE                       # GPL-3.0
-├── GIT_GUIDE.md                  # how to run this repo (Russian)
 └── README.md
 ```
 
@@ -358,9 +391,6 @@ directly. `YouTubePanel` emits `playRequested(path)` / `fileAdded(path)` and
 
 An honest list — these are real, not hypothetical:
 
-- **No auto-advance.** Playback stops at the end of the current track; the next
-  one starts only via `Next` or a double-click (`mediaStatusChanged` /
-  `EndOfMedia` is not wired yet).
 - **No tag reading.** Artist, cover and duration from files are ignored; the
   playlist shows the file name. `Track::artist` is always `"Unknown"`.
 - **Playlist is in memory.** No M3U import/export, no persistence between runs.
@@ -368,7 +398,8 @@ An honest list — these are real, not hypothetical:
 - **Removing a track above the current one** shifts the model index without
   notifying the view — the selection can point at the wrong row afterwards.
 - **No media keys, no MPRIS, no tray icon.**
-- **No packaging.** No AppImage, Flatpak, MSI or `.desktop` file yet.
+- **No bundled packages yet.** Linux installs include a `.desktop` launcher,
+  but there is no AppImage, Flatpak, or Windows installer.
 - **YouTube may be unreachable** from your network (it is from Russia without a
   proxy). Use the SoundCloud source, or add `--proxy` to `yt-dlp`'s own config.
 
@@ -376,7 +407,6 @@ An honest list — these are real, not hypothetical:
 
 ## Roadmap
 
-- [ ] auto-advance and a proper transport state machine (`updateTransportState()`)
 - [ ] `PlaylistModel : QAbstractListModel` + `QListView` (drag & drop, roles)
 - [ ] tag and cover reading (libavformat or taglib), real library scanning
 - [ ] M3U save/load, shuffle, repeat
@@ -421,11 +451,10 @@ that is expected.
 
 ## Contributing
 
-1. Read [`GIT_GUIDE.md`](GIT_GUIDE.md) — branch names, commit style, pushing and PRs.
-2. Build and run the tests before opening a PR (`ctest --test-dir build`).
-3. Keep the layering (`core/` ↔ `ui/`) and put new logic in `core/` so it can be
+1. Build and run the tests before opening a PR (`ctest --test-dir build`).
+2. Keep the layering (`core/` ↔ `ui/`) and put new logic in `core/` so it can be
    tested without a GUI.
-4. UI strings may be Russian, but keep identifiers and comments consistent with
+3. UI strings may be Russian, but keep identifiers and comments consistent with
    the file you touch.
 
 Bug reports are welcome with: OS, Qt version, `yt-dlp --version`, the exact
@@ -462,8 +491,40 @@ GPL-3.0 — see [LICENSE](LICENSE).
 **Статус:** 0.3.0 — ранняя версия, всё ещё ломается. Перед тем как ждать
 поведения foobar2000, прочитайте [Ограничения](#ограничения).
 
+### Быстрый старт
+
+Склонируйте FLACORE, соберите его и добавьте в меню приложений:
+
+```bash
+sudo pacman -S --needed base-devel cmake desktop-file-utils qt6-base \
+                       qt6-multimedia qt6-multimedia-ffmpeg yt-dlp ffmpeg
+
+git clone https://github.com/kiruimaru/FLACORE.git
+cd FLACORE
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build build -j"$(nproc)"
+cmake --install build
+update-desktop-database "$HOME/.local/share/applications"
+```
+
+Нажмите `Super+Alt+Space`, найдите **FLACORE** и нажмите Enter. В Omarchy
+сочетание `Super+Space` открывает главное меню, а `Super+Alt+Space` — меню
+приложений.
+
+- **Локальная музыка:** выберите `Файл → Открыть файлы`, затем дважды нажмите
+  на трек в плейлисте. После его окончания автоматически начнётся следующий.
+- **Поиск музыки онлайн:** откройте вкладку `YouTube`, найдите трек и нажмите
+  **Слушать**, чтобы включить его, или **В библиотеку**, чтобы сохранить.
+- **Запуск из терминала:** выполните `flacore`.
+
+`yt-dlp` нужен для поиска и скачивания музыки онлайн. `ffmpeg` используется
+при сохранении аудио в выбранном формате. Сборку в других Linux-дистрибутивах
+и Windows смотрите в разделе [Сборка](#сборка).
+
 ### Содержание
 
+- [Быстрый старт](#быстрый-старт)
 - [Возможности](#возможности)
 - [Требования](#требования)
 - [Сборка](#сборка)
@@ -483,7 +544,8 @@ GPL-3.0 — see [LICENSE](LICENSE).
 
 - FLAC, MP3, WAV, OGG, M4A, AAC через Qt Multimedia
 - Открытие сразу нескольких файлов, плейлист в правой панели
-- Play / пауза / стоп / следующий / предыдущий, перемотка перетаскиванием, громкость
+- Play / пауза / стоп / следующий / предыдущий, автоматический переход к
+  следующему треку, перемотка перетаскиванием, громкость
 - Двойной клик по строке плейлиста запускает трек
 
 **Онлайн (yt-dlp)**
@@ -756,12 +818,13 @@ FLACORE/
 │       ├── MainWindow.*          # транспорт, плейлист, вкладки, меню
 │       ├── YouTubePanel.*        # поиск, прогресс, кнопки «Слушать»/«В библиотеку»
 │       └── YtDlpSettingsDialog.* # пути к бинарникам, библиотека, формат
+├── packaging/
+│   └── linux/flacore.desktop    # ярлык в меню приложений Linux
 ├── tests/
 │   ├── fake_ytdlp.cpp            # заглушка с тем же CLI-контрактом
 │   ├── ytdlp_test.cpp            # 39 проверок без сети
 │   └── CMakeLists.txt
 ├── LICENSE                       # GPL-3.0
-├── GIT_GUIDE.md                  # как вести репозиторий (по-русски)
 └── README.md
 ```
 
@@ -773,9 +836,6 @@ FLACORE/
 
 Честный список — это реальные вещи, а не гипотетические:
 
-- **Нет автоперехода.** Воспроизведение останавливается на конце текущего трека;
-  следующий запускается только кнопкой «Следующий» или двойным кликом
-  (`mediaStatusChanged` / `EndOfMedia` пока не подключены).
 - **Нет чтения тегов.** Артист, обложка и длительность из файлов игнорируются,
   в плейлисте — имя файла. `Track::artist` всегда `"Unknown"`.
 - **Плейлист живёт в памяти.** Нет импорта/экспорта M3U, нет сохранения между
@@ -784,14 +844,14 @@ FLACORE/
 - **Удаление трека выше текущего** сдвигает индекс модели, не уведомляя
   представление — выделение может указывать не на ту строку.
 - **Нет медиаклавиш, MPRIS и значка в трее.**
-- **Нет упаковки.** Ни AppImage, ни Flatpak, ни MSI, ни `.desktop`.
+- **Пока нет готовых установочных пакетов.** При установке в Linux создаётся
+  ярлык `.desktop`, но AppImage, Flatpak и установщика для Windows пока нет.
 - **YouTube может быть недоступен** из вашей сети (например, из России без
   прокси). Используйте источник SoundCloud или добавьте `--proxy` в конфиг
   самого `yt-dlp`.
 
 ### Планы
 
-- [ ] автопереход и нормальный конечный автомат транспорта (`updateTransportState()`)
 - [ ] `PlaylistModel : QAbstractListModel` + `QListView` (drag & drop, роли)
 - [ ] чтение тегов и обложек (libavformat или taglib), сканирование фонотеки
 - [ ] сохранение/загрузка M3U, shuffle, repeat
@@ -833,11 +893,10 @@ Windows SDK либо компилятора нет вообще. Использ�
 
 ### Участие
 
-1. Прочитайте [`GIT_GUIDE.md`](GIT_GUIDE.md) — ветки, стиль коммитов, пуш и PR.
-2. Перед PR соберите проект и прогоните тесты (`ctest --test-dir build`).
-3. Соблюдайте слои (`core/` ↔ `ui/`) и выносите новую логику в `core/`, чтобы её
+1. Перед PR соберите проект и прогоните тесты (`ctest --test-dir build`).
+2. Соблюдайте слои (`core/` ↔ `ui/`) и выносите новую логику в `core/`, чтобы её
    можно было тестировать без GUI.
-4. Строки интерфейса могут быть на русском, но идентификаторы и комментарии
+3. Строки интерфейса могут быть на русском, но идентификаторы и комментарии
    держите в стиле того файла, который правите.
 
 В баг-репорте полезны: ОС, версия Qt, `yt-dlp --version`, точная команда из лога

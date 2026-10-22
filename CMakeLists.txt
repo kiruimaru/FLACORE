@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 project(FLACORE VERSION 0.3.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 # Стандарт C++
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

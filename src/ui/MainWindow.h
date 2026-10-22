@@ -2,6 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QList>
+#include <QPixmap>
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QPushButton>
@@ -12,6 +14,9 @@
 
 class YtDlp;
 class YouTubePanel;
+class QAction;
+class QResizeEvent;
+class QStackedWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -19,6 +24,9 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+protected:
+    void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     void onOpenFiles();
@@ -37,13 +45,22 @@ private slots:
     void onPlaylistTrackAdded(int index);
     void onCurrentTrackChanged(int index);
     void onYtDlpSettings();
+    void onThemeToggle();
 
 private:
     void setupUI();
     void createMenuBar();
+    void applyTheme(const QString &theme);
+    void updateThemeButton();
     void loadTrack(int index);
     void updateButtonStates();
     void playFile(const QString &path);
+    void applyBackground();
+    void editThemeHardcore();
+    void editThemeInteractive();
+    void exportThemeConfig();
+    void importThemeConfig();
+    void chooseBackground();
 
     // Media
     QMediaPlayer *player;
@@ -53,12 +70,16 @@ private:
     YouTubePanel *youtubePanel;
 
     // UI Components
-    QWidget *centralWidget;
+    QWidget *centralWidget = nullptr;
     QLabel *fileLabel;
+    QLabel *filePathLabel;
     QLabel *currentTimeLabel;
     QLabel *totalTimeLabel;
+    QLabel *playlistCountLabel;
     QSlider *progressSlider;
     QSlider *volumeSlider;
+    QStackedWidget *playlistStack;
+    QStackedWidget *playPauseStack;
 
     // Buttons
     QPushButton *openButton;
@@ -69,9 +90,16 @@ private:
     QPushButton *previousButton;
     QPushButton *removeTrackButton;
     QPushButton *clearPlaylistButton;
+    QPushButton *themeButton;
 
     // Playlist UI
     QListWidget *playlistWidget;
+
+    QAction *darkThemeAction = nullptr;
+    QAction *lightThemeAction = nullptr;
+    QList<QAction *> m_themeActions;
+    QString m_theme = QStringLiteral("dark");
+    QPixmap m_backgroundImage;
 };
 
 #endif // MAINWINDOW_H
