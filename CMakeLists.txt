@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(FLACORE VERSION 0.3.0 LANGUAGES CXX)
+project(FLACORE VERSION 0.4.1 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
@@ -10,9 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Автоматический MOC/RCC для Qt
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC OFF)
 
-# Найти Qt6 (Gui нужен явно: QDesktopServices/QColor)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Multimedia Widgets)
+# Найти Qt6 (Network нужен для загрузки фоновых изображений по ссылке)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Network Multimedia Widgets)
 
 # libav* в коде не используются: yt-dlp вызывает бинарник ffmpeg сам,
 # а QMediaPlayer на Linux и так работает через ffmpeg-бэкенд.
@@ -31,7 +32,7 @@ endif()
 # Добавить поддиректории
 add_subdirectory(src)
 
-# Тесты (сеть не нужны: yt-dlp подменяется заглушкой)
+# Тесты (сеть не нужна: yt-dlp подменяется заглушкой)
 option(FLACORE_BUILD_TESTS "Собирать автотесты" ON)
 if(FLACORE_BUILD_TESTS)
     enable_testing()

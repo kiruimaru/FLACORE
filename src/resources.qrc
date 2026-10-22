@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/">
+        <file>themes/liquid-glass/theme.json</file>
+        <file>themes/liquid-glass/theme.qss</file>
+        <file>themes/midnight/theme.json</file>
+        <file>themes/midnight/theme.qss</file>
+        <file>themes/carbon/theme.json</file>
+        <file>themes/carbon/theme.qss</file>
+        <file>themes/sugar-cloud/theme.json</file>
+        <file>themes/sugar-cloud/theme.qss</file>
+        <file>themes/neon/theme.json</file>
+        <file>themes/neon/theme.qss</file>
+    </qresource>
+</RCC>

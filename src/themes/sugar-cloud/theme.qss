@@ -1,0 +1,29 @@
+/* Sugar Cloud: светлая тема с розовой подсветкой и мягкими панелями. */
+
+QWidget[dataUi="sidebar"] {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #ffffffff, stop:0.4 @panel, stop:1 @panel);
+}
+
+QWidget[dataUi="card"] {
+    background: #e6ffffff;
+    border: 1px solid @border;
+}
+
+QWidget[dataUi="player"] {
+    background: #f2ffffff;
+    border: 1px solid @border;
+}
+
+QListWidget[dataUi="sidebar"]::item:selected {
+    background: @accent-soft;
+    color: #8a1f5c;
+}
+
+QPushButton[variant="accent"] {
+    border-radius: @radius-sm;
+}
+
+QLineEdit[dataUi="search"], QLineEdit, QComboBox {
+    background: #ffffffff;
+}

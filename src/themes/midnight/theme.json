@@ -1,0 +1,21 @@
+{
+  "id": "midnight",
+  "name": "Midnight",
+  "description": {
+    "ru": "Глубокий синий, холодное стекло",
+    "en": "Deep blue, cool glass"
+  },
+  "version": "1.0.0",
+  "author": { "name": "FLACORE", "github": "nex1door" },
+  "license": "MIT",
+  "accent": "#7aa2ff",
+  "background": "#070a12",
+  "font": "inter",
+  "mode": "beauty",
+  "tokens": {
+    "radius": 18,
+    "glass-alpha": 0.5,
+    "blur": 30,
+    "border": "#1e7aa2ff"
+  }
+}

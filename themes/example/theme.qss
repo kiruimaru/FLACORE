@@ -1,0 +1,27 @@
+/* Пример своей темы. @токены подставляет приложение (см. docs/THEMES.md). */
+
+QWidget[dataUi="sidebar"] {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 @accent-soft, stop:0.6 @panel, stop:1 @panel);
+}
+
+QWidget[dataUi="player"] {
+    border: 1px solid @border-strong;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 @panel, stop:1 @accent-soft);
+}
+
+QWidget[dataUi="card"] {
+    border: 1px solid @border;
+}
+
+QListWidget[dataUi="sidebar"]::item:selected {
+    color: @accent;
+    border: 1px solid @accent-glow;
+}
+
+QPushButton[variant="accent"] {
+    border-radius: @radius-sm;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 @accent, stop:1 @accent-hover);
+}

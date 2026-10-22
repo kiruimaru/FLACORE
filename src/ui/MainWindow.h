@@ -5,101 +5,114 @@
 #include <QList>
 #include <QPixmap>
 #include <QMediaPlayer>
-#include <QAudioOutput>
-#include <QPushButton>
-#include <QSlider>
-#include <QLabel>
-#include <QListWidget>
-#include "core/player/Playlist.h"
 
-class YtDlp;
-class YouTubePanel;
-class QAction;
+#include "core/online/Charts.h"
+#include "core/ytdlp/YtDlpTypes.h"
+
+class QLabel;
+class QListWidget;
+class QPoint;
 class QResizeEvent;
 class QStackedWidget;
+class QTimer;
 
-class MainWindow : public QMainWindow {
+class AuroraBackdrop;
+class AppearancePage;
+class DiscoverPage;
+class LibraryPage;
+class PlayerBar;
+class Playlist;
+class TitleBar;
+class YouTubePanel;
+class YtDlp;
+class YtDlpPage;
+
+/**
+ * Каркас приложения: шапка, сайдбар с разделами, страницы по центру и плавающая
+ * панель плеера снизу. Владеет состоянием (Playlist, QMediaPlayer, YtDlp) и
+ * связывает его с представлением; страницы ничего не знают друг о друге.
+ */
+class MainWindow : public QMainWindow
+{
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() override;
 
 protected:
+    void changeEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     void onOpenFiles();
-    void onPlay();
-    void onPause();
+    void onPlayPause();
     void onStop();
     void onNext();
     void onPrevious();
-    void onTrackDoubleClicked(QListWidgetItem *item);
-    void onRemoveTrack();
-    void onClearPlaylist();
+    void onSeek(int positionMs);
+    void onVolumeChanged(int value);
+    void onTrackActivated(int row);
+    void onPlaylistTrackAdded(int index);
+    void onPlaylistTrackRemoved(int index);
+    void onCurrentTrackChanged(int index);
     void onPositionChanged(qint64 position);
     void onDurationChanged(qint64 duration);
-    void onVolumeChanged(int value);
-    void onSeek(int position);
-    void onPlaylistTrackAdded(int index);
-    void onCurrentTrackChanged(int index);
+    void onMediaStatusChanged(QMediaPlayer::MediaStatus status);
+    void onMediaError(QMediaPlayer::Error error, const QString &errorString);
+    void onShowMenu(const QPoint &globalPos);
     void onYtDlpSettings();
-    void onThemeToggle();
+    void onNavChanged(int row);
+    void setFrameless(bool frameless);
+    void toggleMaximize();
 
 private:
-    void setupUI();
-    void createMenuBar();
-    void applyTheme(const QString &theme);
-    void updateThemeButton();
-    void loadTrack(int index);
-    void updateButtonStates();
-    void playFile(const QString &path);
-    void applyBackground();
-    void editThemeHardcore();
-    void editThemeInteractive();
-    void exportThemeConfig();
-    void importThemeConfig();
-    void chooseBackground();
+    void setupUi();
+    void setupActions();
+    void wireCore();
+    /// Строка чарта: искать в yt-dlp и включить/сохранить первый результат.
+    void routeChartTrack(const ChartTrack &track, bool saveToLibrary);
+    /// Прослушать 30-секундное превью прямо из сети (Deezer/Apple).
+    void playChartPreview(const ChartTrack &track);
+    /// Прочитать чарт SoundCloud через yt-dlp.
+    void requestSoundCloudChart(const QString &url);
+    void addSoundCloudChart(const QList<YtDlpResult> &results);
+    void applyFrameless(bool frameless);
+    void loadTrack(int index, bool autoplay);
+    void addPaths(const QStringList &paths, bool fromDrop);
+    void notify(const QString &text, bool error = false);
+    void updateNavIcons();
+    void refreshTransport();
+    void positionToast();
 
-    // Media
-    QMediaPlayer *player;
-    QAudioOutput *audioOutput;
-    Playlist *playlist;
-    YtDlp *ytdlp;
-    YouTubePanel *youtubePanel;
+    // каркас
+    AuroraBackdrop *m_backdrop = nullptr;
+    TitleBar *m_titleBar = nullptr;
+    QListWidget *m_nav = nullptr;
+    QStackedWidget *m_pages = nullptr;
+    PlayerBar *m_playerBar = nullptr;
+    QLabel *m_toast = nullptr;
+    QTimer *m_toastTimer = nullptr;
 
-    // UI Components
-    QWidget *centralWidget = nullptr;
-    QLabel *fileLabel;
-    QLabel *filePathLabel;
-    QLabel *currentTimeLabel;
-    QLabel *totalTimeLabel;
-    QLabel *playlistCountLabel;
-    QSlider *progressSlider;
-    QSlider *volumeSlider;
-    QStackedWidget *playlistStack;
-    QStackedWidget *playPauseStack;
+    // страницы
+    DiscoverPage *m_discover = nullptr;
+    LibraryPage *m_library = nullptr;
+    YouTubePanel *m_youtube = nullptr;
+    AppearancePage *m_appearance = nullptr;
+    YtDlpPage *m_ytdlpPage = nullptr;
 
-    // Buttons
-    QPushButton *openButton;
-    QPushButton *playButton;
-    QPushButton *pauseButton;
-    QPushButton *stopButton;
-    QPushButton *nextButton;
-    QPushButton *previousButton;
-    QPushButton *removeTrackButton;
-    QPushButton *clearPlaylistButton;
-    QPushButton *themeButton;
+    // ядро
+    QMediaPlayer *m_media = nullptr;
+    QAudioOutput *m_audio = nullptr;
+    Playlist *m_playlist = nullptr;
+    YtDlp *m_ytdlp = nullptr;
 
-    // Playlist UI
-    QListWidget *playlistWidget;
-
-    QAction *darkThemeAction = nullptr;
-    QAction *lightThemeAction = nullptr;
-    QList<QAction *> m_themeActions;
-    QString m_theme = QStringLiteral("dark");
-    QPixmap m_backgroundImage;
+    int m_playingIndex = -1;
+    bool m_chartSearchPending = false;   // чарт SoundCloud читает yt-dlp
+    bool m_previewPlaying = false;       // играет превью, а не трек плейлиста
+    int m_inset = 0;
+    bool m_frameless = false;
+    bool m_userTransport = false;
 };
 
 #endif // MAINWINDOW_H
