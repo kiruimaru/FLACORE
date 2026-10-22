@@ -72,3 +72,7 @@ core.[0-9]*
 # User-specific files
 config/local_*.json
 *.log
+
+# Готовые сборки (переносимые папки и архивы)
+dist/
+*.zip

@@ -22,8 +22,9 @@ A local music player written in C++17 / Qt 6. It plays your own library and pull
 music from YouTube, SoundCloud and 1000+ other sites through **yt-dlp** — search,
 listen immediately, or save to a FLAC library, all inside the same window.
 
-**Status:** 0.3.0 — early, actively breaking. Read [Known limitations](#known-limitations)
-before expecting it to behave like foobar2000.
+**Status:** 0.4.1 — early, actively breaking. The `Discover` section now shows live
+charts (Deezer, Apple Music, SoundCloud). Read
+[Known limitations](#known-limitations) before expecting it to behave like foobar2000.
 
 ---
 
@@ -53,9 +54,27 @@ before expecting it to behave like foobar2000.
 ### Local playback
 
 - FLAC, MP3, WAV, OGG, M4A, AAC through Qt Multimedia
-- Multi-file open dialog, playlist in the right panel
+- Multi-file open dialog and **drag & drop** of files onto the track list
+- Tags are read (FLAC/MP3/WAV): title, artist, album, duration and embedded cover
 - Play / pause / stop / next / previous, drag-to-seek, volume
-- Double-click a playlist row to play it
+- **Auto-advance** to the next track, readable errors on broken files
+- Double-click a playlist row to play it, `Ctrl+O`/`Space`/`Ctrl+←`/`Ctrl+→` shortcuts
+
+### Appearance and UI
+
+- **Glass layout**: custom window frame, sidebar sections, floating player bar,
+  aurora backdrop that reacts to the accent colour
+- **Themes are packages** — `theme.json` + optional `theme.qss` + `assets/`, five
+  built in (`liquid-glass`, `midnight`, `carbon`, `sugar-cloud`, `neon`), your own
+  dropped into the themes folder and picked from `Appearance → Themes`
+- **Tune everything**: accent colour (or take it from the track's cover art),
+  background image from a file or a URL, font family and scale, corner radius,
+  glass density, blur, animations, performance mode
+- **Your own CSS** over the theme, applied live, with tokens (`@accent`, `@radius`,
+  `@font-sans`, …) and stable hooks such as `QWidget[dataUi="player"]`
+- **Way out if a style breaks the UI**: `Ctrl+Alt+Shift+C` or `--no-custom-css`
+- Search filter in the header, toast messages instead of a status bar
+- Full reference: [docs/THEMES.md](docs/THEMES.md)
 
 ### Online (yt-dlp)
 
@@ -68,6 +87,30 @@ before expecting it to behave like foobar2000.
 - Live download progress (percent, speed, ETA), a cancel button, and readable
   errors instead of silent failure
 
+### Discover — live charts
+
+- `Discover` is the first section on the left: shelves with **live charts** from
+  open endpoints that need no registration and no API key
+- **Deezer chart** — worldwide top or by genre (17 genres: pop, rap, electronic,
+  dance, rock, R&B, jazz, classical, metal, Russian music, …), 30 tracks each
+- **Apple Music chart** — most-played or new music by country (US, UK, DE, FR, RU)
+- **SoundCloud chart** — read through `yt-dlp` (`--flat-playlist`); if SoundCloud
+  is unreachable (it answers 404 to Russian IPs), the shelf says so instead of
+  pretending to be empty
+- Tracks show artist, duration and source; cover art is fetched in the background
+  and cached in `covercache`, so the page paints instantly next time
+- Right-click a row: play a **30-second preview** immediately (Deezer and Apple
+  serve one), **listen in full** or **save to library** through yt-dlp, open the
+  track page, or copy `artist - title`
+- **Listen / Save from a chart** reuse the YouTube tab: the row becomes a search
+  query on the chosen source, the first playable match is downloaded into the
+  cache and starts playing. If a match is DRM-protected or dead, the next
+  candidates are tried (up to three, and the source switches YouTube ↔ SoundCloud)
+- `FLACORE_OFFLINE=1` keeps the app off the network completely — the shelves stay
+  empty and nothing is requested
+- The engine lives in `core/online/`: `Charts` (URLs, parsers, catalogues) and
+  `CoverLoader` (async covers with a disk cache), so it is testable without a UI
+
 ### Under the hood
 
 - `YtDlp` is an async `QProcess` wrapper — no shell, no injection, no blocking UI
@@ -79,14 +122,11 @@ before expecting it to behave like foobar2000.
 
 ## Screenshots
 
-> No screenshots in the repository yet. Add them here (drag & drop into the
-> GitHub editor uploads the file and inserts a link):
-
-```
-docs/screenshot-main.png      — main window: player + playlist
-docs/screenshot-search.png    — YouTube tab with search results
-docs/screenshot-settings.png  — yt-dlp settings dialog
-```
+Screenshots are produced by the UI test (`ctest --test-dir build` writes them into
+`build/tests/screenshots/`): `liquid-glass.png`, `neon.png`, `sugar-cloud.png`,
+`page-discover.png`, `page-appearance.png`, `page-appearance-bottom.png`,
+`page-youtube.png`.
+Copy the ones you like into `docs/` and link them here.
 
 ---
 
@@ -96,7 +136,7 @@ docs/screenshot-settings.png  — yt-dlp settings dialog
 |------|-----|---------|
 | C++ compiler | build | C++17 (GCC 11+, Clang 14+, MSVC 2019+) |
 | CMake | build | 3.21+ |
-| Qt 6: `Core`, `Gui`, `Widgets`, `Multimedia` | UI + playback | 6.5+ (tested on 6.12) |
+| Qt 6: `Core`, `Gui`, `Widgets`, `Multimedia`, `Network` | UI, playback and background image download | 6.5+ (tested on 6.12) |
 | `yt-dlp` | online search / download | recent (tested 2026.08.19) |
 | `ffmpeg` binary | **only** for saving as FLAC/MP3/Opus | 4.x+ |
 | Qt Multimedia backend | actual audio output | `qt6-multimedia-ffmpeg` on Linux |
@@ -215,6 +255,18 @@ If `yt-dlp` is not in `PATH`, point the app at it:
 Pasting a direct link (`https://…`) into the search field skips the search and
 fetches that single track.
 
+### Browse live charts
+
+1. Open the `Discover` section (it is the first one, shown on start).
+2. Pick a genre for **Deezer** or a country and feed for **Apple Music** — the
+   shelf reloads as soon as you change the dropdown, or press «Показать».
+3. `Обновить всё` reloads every shelf, including the SoundCloud chart.
+4. Select a row and press `Enter`/double-click to listen in full, or right-click
+   for the menu: `▶ Превью 30 секунд`, `Слушать полностью`, `Сохранить в
+   библиотеку`, `Открыть страницу трека`, `Скопировать «исполнитель — название»`.
+5. Full playback happens on the `YouTube` tab, where progress is visible; the
+   player picks the file up as soon as it is downloaded.
+
 ### Settings
 
 `Tools → yt-dlp settings…` — path to `yt-dlp`, the folder containing `ffmpeg`,
@@ -286,12 +338,25 @@ Stored with `QSettings` — no config file parsing involved:
 | `ytdlp/ffmpegDir` | folder containing the `ffmpeg` binary | auto: `PATH` |
 | `ytdlp/libraryDir` | where «В библиотеку» saves | `~/Music/FLACORE` |
 | `ytdlp/audioFormat` | `flac` / `mp3` / `opus` / `m4a` | `flac` |
+| `appearance/theme` | active theme id | `liquid-glass` |
+| `appearance/accent` | accent override (`#rrggbb`), empty = from the theme | empty |
+| `appearance/customCss`, `appearance/customCssEnabled` | your CSS and its toggle | empty, on |
+| `appearance/backgroundImage`, `appearance/backgroundBlur` | wallpaper and its blur | empty, theme value |
+| `appearance/{radius,glassAlpha,blur,font,fontScale,mode,animations}` | appearance sliders | theme values |
 
 Where it lands:
 
 - Linux: `~/.config/flacore.conf`, cache in `~/.cache/flacore/ytdlp`
 - Windows: registry `HKEY_CURRENT_USER\Software\flacore`, cache in
   `%LOCALAPPDATA%\flacore\cache\ytdlp`
+- Your themes: `%APPDATA%\FLACORE\FLACORE\themes` on Windows,
+  `~/.local/share/FLACORE/FLACORE/themes` on Linux (see [docs/THEMES.md](docs/THEMES.md))
+
+Two environment variables change behaviour without touching the settings:
+
+- `FLACORE_OFFLINE=1` — never touch the network (charts stay empty). Used by the
+  tests, handy on a metered connection.
+- `FLACORE_LIVE_YTDLP=<path>` — used by the manual live probe to point at `yt-dlp`.
 
 Delete those to factory-reset the app.
 
@@ -308,17 +373,42 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-What is covered (39 assertions):
+What is covered (five test binaries, 304 assertions):
 
-- availability probe: `--version` output and the "binary missing" path
-- search JSON: playlist with `entries`, single object for a direct URL,
-  `uploader` → `channel` fallback, live streams → duration 0
-- provider routing: `ytsearch` vs `scsearch`
-- download: progress percentages, final path from `FLACORE_FILE`, file exists
-- failures: non-zero exit with `ERROR: …` in stderr
-- cancel: process killed → `cancelled()`, no error signal
+- `ytdlp_test` — the CLI contract against a compiled stub: availability probe,
+  search JSON (playlist, direct URL, `uploader` → `channel`, live streams),
+  `ytsearch` vs `scsearch`, download progress and final path, failures, cancel
+- `media_test` — tag reading on fixtures built byte by byte (FLAC STREAMINFO +
+  VORBIS_COMMENT + PICTURE, MP3 ID3v2 + MPEG frame, WAV), playlist metadata,
+  cover palette extraction
+- `theme_test` — `theme.json` parsing and validation, token derivation for dark
+  and light themes, `@token` substitution, custom CSS sanitising, built stylesheet
+  (no unresolved tokens), plus WCAG contrast checks for every built-in theme
+- `charts_test` — the Discover engine on fixtures: Deezer and Apple chart JSON
+  (artist-picture fallback, `durationInMillis`, `100x100bb` → `600x600bb`), error
+  payloads and broken JSON, source URLs and limits, genre and country catalogues,
+  `artist - title` queries, `yt-dlp` records → chart rows, and the SoundCloud
+  chart read through the `yt-dlp` stub
+- `ui_test` (offscreen) — window shell, playlist wired to the view, add/remove/
+  clear, index shifts, all built-in themes applied on a live window, custom CSS,
+  the `Ctrl+Alt+Shift+C` escape hatch, the Discover shelves fed with synthetic
+  chart rows (roles, durations, `artist - title` routing, 30-second preview URL);
+  it also saves screenshots
 
 Turn tests off with `-DFLACORE_BUILD_TESTS=OFF`.
+
+### Live probe (network, manual)
+
+`tests/live_probe.cpp` is built but **not** registered with `ctest`: it needs the
+real network and the real `yt-dlp`. It boots the whole window and checks what
+fixtures cannot: Deezer and Apple charts actually arriving, a preview stream
+actually playing, a chart row actually becoming a cached file in the playlist,
+and the SoundCloud chart responding.
+
+```bash
+cd build/tests
+FLACORE_LIVE_YTDLP=/path/to/yt-dlp ./live_probe.exe
+```
 
 ---
 
@@ -328,20 +418,37 @@ Turn tests off with `-DFLACORE_BUILD_TESTS=OFF`.
 FLACORE/
 ├── CMakeLists.txt                # Qt6 lookup, optional FFmpeg libs, tests
 ├── src/
-│   ├── main.cpp                  # QApplication + MainWindow
-│   ├── CMakeLists.txt            # qt_add_executable, /W3 or -Wall -Wextra
+│   ├── main.cpp                  # QApplication, --no-custom-css, ThemeManager
+│   ├── CMakeLists.txt            # flacore_lib + qt_add_executable, -Wall -Wextra
+│   ├── resources.qrc             # built-in themes (theme.json + theme.qss)
 │   ├── core/
-│   │   ├── player/Playlist.*     # Track struct, list, current index, signals
+│   │   ├── media/                # MediaTags (FLAC/MP3/WAV tags, cover), CoverPalette
+│   │   ├── online/               # Charts (Deezer/Apple charts, parsers), CoverLoader
+│   │   ├── player/Playlist.*      # Track, list, current index, signals
 │   │   └── ytdlp/
 │   │       ├── YtDlpTypes.h      # YtDlpResult, formatDuration()
 │   │       └── YtDlp.*           # QProcess wrapper: search/download/cancel
+│   ├── themes/<id>/              # built-in themes: theme.json + theme.qss
 │   └── ui/
-│       ├── MainWindow.*          # transport, playlist, tabs, menus
+│       ├── MainWindow.*          # shell: title bar, sidebar, pages, player bar
 │       ├── YouTubePanel.*        # search UI, progress, play/save buttons
-│       └── YtDlpSettingsDialog.* # binary paths, library, format
+│       ├── YtDlpSettingsForm.*   # shared settings form
+│       ├── YtDlpSettingsDialog.* # the same form as a dialog
+│       ├── theme/                # Theme, StyleSheet, ThemeManager, ThemeUtil
+│       ├── pages/                # Discover, Library, Appearance, ThemeTile, YtDlp
+│       └── widgets/              # AuroraBackdrop, GlassPanel, CoverArt, SeekBar,
+│                                 # TitleBar, PlayerBar, TrackDelegate, ShelfDelegate,
+│                                 # Icons
+├── themes/example/               # user theme to copy (see docs/THEMES.md)
+├── docs/THEMES.md                # theme format, tokens, hooks, own CSS
 ├── tests/
 │   ├── fake_ytdlp.cpp            # stub with the same CLI contract
-│   ├── ytdlp_test.cpp            # 39 assertions, no network
+│   ├── ytdlp_test.cpp            # yt-dlp wrapper, no network
+│   ├── media_test.cpp            # tags and cover palette on synthetic fixtures
+│   ├── theme_test.cpp            # theme JSON, tokens, custom CSS
+│   ├── charts_test.cpp           # charts, parsers, yt-dlp records (fixtures)
+│   ├── ui_test.cpp               # offscreen UI + screenshots
+│   ├── live_probe.cpp            # manual run with the real network and yt-dlp
 │   └── CMakeLists.txt
 ├── LICENSE                       # GPL-3.0
 ├── GIT_GUIDE.md                  # how to run this repo (Russian)
@@ -349,8 +456,9 @@ FLACORE/
 ```
 
 Layering rule: `core/` knows nothing about widgets, `ui/` never spawns processes
-directly. `YouTubePanel` emits `playRequested(path)` / `fileAdded(path)` and
-`MainWindow` decides what to do with the file.
+directly. `core/` + `ui/` build into the static library `flacore_lib`, so the
+tests link the very same code the app runs. `Playlist` owns the state and emits
+signals; pages only render it and report user intents.
 
 ---
 
@@ -358,39 +466,50 @@ directly. `YouTubePanel` emits `playRequested(path)` / `fileAdded(path)` and
 
 An honest list — these are real, not hypothetical:
 
-- **No auto-advance.** Playback stops at the end of the current track; the next
-  one starts only via `Next` or a double-click (`mediaStatusChanged` /
-  `EndOfMedia` is not wired yet).
-- **No tag reading.** Artist, cover and duration from files are ignored; the
-  playlist shows the file name. `Track::artist` is always `"Unknown"`.
 - **Playlist is in memory.** No M3U import/export, no persistence between runs.
 - **No shuffle / repeat / queue.**
-- **Removing a track above the current one** shifts the model index without
-  notifying the view — the selection can point at the wrong row afterwards.
 - **No media keys, no MPRIS, no tray icon.**
 - **No packaging.** No AppImage, Flatpak, MSI or `.desktop` file yet.
+- **The "glass" is not a real backdrop filter.** Qt Widgets cannot blur what is
+  behind a widget, so panels are translucent and the backdrop image itself is
+  blurred. Looks close, costs nothing.
+- **Tags are read for FLAC/MP3/WAV only.** M4A/AAC/OGG show the file name.
 - **YouTube may be unreachable** from your network (it is from Russia without a
   proxy). Use the SoundCloud source, or add `--proxy` to `yt-dlp`'s own config.
+- **Charts come from public, undocumented endpoints** (Deezer, the Apple Marketing
+  Tools RSS feed). They need no API key — and that is also their weakness: the
+  formats can change without notice, and the endpoints can be blocked.
+- **SoundCloud charts are read through `yt-dlp`.** SoundCloud answers 404 to
+  `soundcloud.com/charts` from some regions (Russia included), so that shelf shows
+  an error there; the Deezer and Apple shelves keep working.
+- **The feed is not personalised.** No likes, no listening history, no
+  recommendations — just charts.
 
 ---
 
 ## Roadmap
 
-- [ ] auto-advance and a proper transport state machine (`updateTransportState()`)
+- [x] auto-advance and a proper transport state (`refreshTransport()`, `EndOfMedia`)
 - [ ] `PlaylistModel : QAbstractListModel` + `QListView` (drag & drop, roles)
-- [ ] tag and cover reading (libavformat or taglib), real library scanning
+- [x] tag and cover reading (FLAC/MP3/WAV), accent from the cover palette
+- [x] theme system: packages, tokens, own CSS, escape hatch — see `docs/THEMES.md`
+- [x] Discover section: live charts (Deezer / Apple Music / SoundCloud via yt-dlp)
+- [ ] personalised feed: likes, history, recommendations
+- [ ] 30-second previews without leaving the Discover page (they currently play in
+      the main player bar)
 - [ ] M3U save/load, shuffle, repeat
 - [ ] download queue instead of one job at a time
 - [ ] MPRIS2 + media keys, tray icon
-- [ ] GitHub Actions: build on Linux + tests
+- [ ] GitHub Actions: build on Linux + the four test binaries
 - [ ] packaging: AppImage / Flatpak / Windows installer
 
 ---
 
 ## Troubleshooting
 
-**«yt-dlp не найден»** — the binary is not in `PATH`. Set the full path in
-`Tools → yt-dlp settings…`. On Windows `pip install` puts it into
+**«yt-dlp не найден»** — the binary is not in `PATH`. Set the full path in the
+`yt-dlp` section on the left (or `Меню → Настройки yt-dlp…`). On Windows
+`pip install` puts it into
 `%LOCALAPPDATA%\Programs\Python\Python3xx\Scripts`, which is often not in `PATH`.
 
 **Download works, FLAC save fails** — no `ffmpeg`. Install it or point to its
@@ -412,6 +531,17 @@ MSYS2 shell.
 
 **`CXX compiler identification is unknown` on Windows** — Visual Studio without
 the Windows SDK, or no compiler at all. Use the MSYS2 route above.
+
+**Charts stay empty / «Deezer недоступен»** — the app could not reach the chart
+sources. Check the internet, a proxy/VPN, or run with `FLACORE_OFFLINE=1` if you
+want the app to stay off the network on purpose. The SoundCloud shelf failing with
+a 404 while Deezer works means SoundCloud is blocked for your region, not a bug.
+
+**A chart row plays the wrong track or fails** — the row is turned into an
+`artist - title` search on the source chosen on the YouTube tab. If the first hit
+is DRM-protected, the app automatically tries the next candidates (up to three)
+and then the other source. If everything fails, use `Открыть страницу трека` and
+paste the link into the search field instead.
 
 **Progress stays at 0 %** — `yt-dlp` did not report `total_bytes_estimate`
 (common for HLS). The bar stays in busy mode and the final path still arrives;
@@ -459,8 +589,9 @@ GPL-3.0 — see [LICENSE](LICENSE).
 с YouTube, SoundCloud и ещё 1000+ сайтов через **yt-dlp**: поиск, мгновенное
 прослушивание или сохранение в библиотеку FLAC — всё в одном окне.
 
-**Статус:** 0.3.0 — ранняя версия, всё ещё ломается. Перед тем как ждать
-поведения foobar2000, прочитайте [Ограничения](#ограничения).
+**Статус:** 0.4.1 — ранняя версия, всё ещё ломается. В разделе «Обзор» появились
+живые чарты (Deezer, Apple Music, SoundCloud). Перед тем как ждать поведения
+foobar2000, прочитайте [Ограничения](#ограничения).
 
 ### Содержание
 
@@ -482,9 +613,27 @@ GPL-3.0 — see [LICENSE](LICENSE).
 **Локальное воспроизведение**
 
 - FLAC, MP3, WAV, OGG, M4A, AAC через Qt Multimedia
-- Открытие сразу нескольких файлов, плейлист в правой панели
+- Открытие сразу нескольких файлов и **перетаскивание** файлов в список
+- Теги читаются (FLAC/MP3/WAV): название, исполнитель, альбом, длительность, обложка
 - Play / пауза / стоп / следующий / предыдущий, перемотка перетаскиванием, громкость
-- Двойной клик по строке плейлиста запускает трек
+- **Автопереход** на следующий трек, понятные ошибки на битых файлах
+- Двойной клик по строке плейлиста запускает трек; горячие клавиши `Ctrl+O`, `Space`, `Ctrl+←/→`
+
+**Оформление и интерфейс**
+
+- **Стеклянная раскладка**: своя шапка окна, разделы слева, плавающая панель
+  плеера, живой фон, который реагирует на акцент
+- **Темы — это пакеты**: `theme.json` + необязательный `theme.qss` + `assets/`,
+  пять встроенных (`liquid-glass`, `midnight`, `carbon`, `sugar-cloud`, `neon`),
+  свои кладутся в папку тем и выбираются в «Оформление → Тема»
+- **Настраивается всё**: акцент (в том числе из обложки трека), фоновое
+  изображение из файла или по ссылке, шрифт и его масштаб, скругление,
+  плотность стекла, размытие, анимации, режим производительности
+- **Свой CSS** поверх темы, применяется сразу, с токенами (`@accent`, `@radius`,
+  `@font-sans`, …) и стабильными хуками вида `QWidget[dataUi="player"]`
+- **Если стиль сломал интерфейс**: `Ctrl+Alt+Shift+C` или запуск с `--no-custom-css`
+- Поиск-фильтр в шапке, всплывающие сообщения вместо строки состояния
+- Полное описание: [docs/THEMES.md](docs/THEMES.md)
 
 **Онлайн (yt-dlp)**
 
@@ -497,6 +646,33 @@ GPL-3.0 — see [LICENSE](LICENSE).
 - Живой прогресс (проценты, скорость, ETA), кнопка отмены и понятные ошибки
   вместо молчаливого отказа
 
+**Обзор — живая подборка**
+
+- `Обзор` — первый раздел слева: полки с **живыми чартами** из открытых
+  источников, без регистрации и без API-ключей
+- **Чарт Deezer** — топ по всему миру или по жанру (17 жанров: поп, рэп,
+  электронная, танцевальная, рок, R&B, джаз, классика, металл, русская музыка и
+  другие), по 30 треков
+- **Чарт Apple Music** — самые прослушиваемые или новинки по стране
+  (США, Великобритания, Германия, Франция, Россия)
+- **Чарт SoundCloud** — читается через `yt-dlp` (`--flat-playlist`); если
+  SoundCloud недоступен (из России он отвечает 404), полка честно об этом пишет,
+  а не притворяется пустой
+- В строках видны исполнитель, длительность и источник; обложки докачиваются в
+  фоне и кладутся в кэш `covercache`, поэтому страница открывается мгновенно
+- Правый клик по строке: **превью на 30 секунд** сразу (его отдают Deezer и
+  Apple), **слушать полностью** или **сохранить в библиотеку** через yt-dlp,
+  открыть страницу трека, скопировать «исполнитель — название»
+- **«Слушать» и «В библиотеку» из чарта** работают через вкладку `YouTube`:
+  строка превращается в поисковый запрос на выбранном источнике, первый живой
+  результат скачивается в кэш и сразу играет. Если он под DRM или удалён,
+  приложение само пробует следующие (до трёх) и переключает источник
+  YouTube ↔ SoundCloud
+- `FLACORE_OFFLINE=1` полностью отключает сеть — полки остаются пустыми, запросов
+  нет
+- Движок лежит в `core/online/`: `Charts` (ссылки, парсеры, справочники) и
+  `CoverLoader` (асинхронные обложки с кэшем на диске) — тестируется без GUI
+
 **Под капотом**
 
 - `YtDlp` — асинхронная обёртка над `QProcess`: без shell, без инъекций,
@@ -507,14 +683,11 @@ GPL-3.0 — see [LICENSE](LICENSE).
 
 ### Скриншоты
 
-> В репозитории пока нет скриншотов. Добавьте их сюда (перетаскивание картинки
-> в редактор GitHub загружает файл и вставляет ссылку):
-
-```
-docs/screenshot-main.png      — главное окно: плеер + плейлист
-docs/screenshot-search.png    — вкладка YouTube с результатами поиска
-docs/screenshot-settings.png  — диалог настроек yt-dlp
-```
+Скриншоты делает интерфейсный тест (`ctest --test-dir build` кладёт их в
+`build/tests/screenshots/`): `liquid-glass.png`, `neon.png`, `sugar-cloud.png`,
+`page-discover.png`, `page-appearance.png`, `page-appearance-bottom.png`,
+`page-youtube.png`.
+Скопируйте понравившиеся в `docs/` и добавьте ссылки сюда.
 
 ### Требования
 
@@ -522,7 +695,7 @@ docs/screenshot-settings.png  — диалог настроек yt-dlp
 |-----|-------|--------|
 | Компилятор C++ | сборка | C++17 (GCC 11+, Clang 14+, MSVC 2019+) |
 | CMake | сборка | 3.21+ |
-| Qt 6: `Core`, `Gui`, `Widgets`, `Multimedia` | интерфейс и воспроизведение | 6.5+ (проверено на 6.12) |
+| Qt 6: `Core`, `Gui`, `Widgets`, `Multimedia`, `Network` | интерфейс, воспроизведение, загрузка фона по ссылке | 6.5+ (проверено на 6.12) |
 | `yt-dlp` | поиск и скачивание | свежий (проверено 2026.08.19) |
 | бинарник `ffmpeg` | **только** для сохранения в FLAC/MP3/Opus | 4.x+ |
 | бэкенд Qt Multimedia | собственно звук | `qt6-multimedia-ffmpeg` на Linux |
@@ -640,6 +813,18 @@ winget install Gyan.FFmpeg         # Windows
 Если вставить в поле поиска прямую ссылку (`https://…`), поиск пропускается и
 загружается именно этот трек.
 
+**Живая подборка**
+
+1. Откройте раздел `Обзор` (он первый и показывается при запуске).
+2. Выберите жанр для **Deezer** или страну и ленту для **Apple Music** — полка
+   обновляется сразу при смене списка, либо нажмите «Показать».
+3. «Обновить всё» перезагружает все полки, включая чарт SoundCloud.
+4. Выберите строку: `Enter`/двойной клик — слушать полностью; правый клик — меню
+   «▶ Превью 30 секунд», «Слушать полностью», «Сохранить в библиотеку»,
+   «Открыть страницу трека», «Скопировать „исполнитель — название“».
+5. Полное воспроизведение идёт через вкладку `YouTube`, там виден прогресс;
+   плеер подхватывает файл сразу после скачивания.
+
 **Настройки**
 
 «Инструменты → Настройки yt-dlp…» — путь к `yt-dlp`, папка с `ffmpeg`, папка
@@ -714,6 +899,12 @@ yt-dlp -f bestaudio/best -x --audio-format flac --audio-quality 0 \
 - Windows: реестр `HKEY_CURRENT_USER\Software\flacore`, кэш в
   `%LOCALAPPDATA%\flacore\cache\ytdlp`
 
+Две переменные окружения меняют поведение без правки настроек:
+
+- `FLACORE_OFFLINE=1` — не ходить в сеть вообще (полки чартов остаются пустыми).
+  Используется тестами, пригодится на лимитированном трафике.
+- `FLACORE_LIVE_YTDLP=<путь>` — путь к `yt-dlp` для ручного живого прогона.
+
 Удалите эти данные, чтобы сбросить приложение к состоянию «как после установки».
 
 ### Тесты
@@ -727,17 +918,44 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-Что покрыто (39 проверок):
+Что покрыто (пять тестовых бинарников, 304 проверок):
 
-- проверка доступности: вывод `--version` и путь «бинарник отсутствует»
-- разбор JSON: плейлист с `entries`, одиночный объект для прямой ссылки,
-  подстановка `uploader` → `channel`, live-стримы → длительность 0
-- маршрутизация источника: `ytsearch` против `scsearch`
-- скачивание: проценты прогресса, итоговый путь из `FLACORE_FILE`, файл существует
-- ошибки: ненулевой код выхода и `ERROR: …` в stderr
-- отмена: процесс убит → `cancelled()`, без сигнала ошибки
+- `ytdlp_test` — контракт CLI на скомпилированной заглушке: проверка
+  доступности, разбор JSON (плейлист, прямая ссылка, `uploader` → `channel`,
+  live-стримы), `ytsearch` против `scsearch`, прогресс и итоговый путь,
+  ошибки, отмена
+- `media_test` — чтение тегов на фикстурах, собранных байт за байтом (FLAC
+  STREAMINFO + VORBIS_COMMENT + PICTURE, MP3 ID3v2 + кадр MPEG, WAV),
+  метаданные в плейлисте, палитра из обложки
+- `theme_test` — разбор и проверка `theme.json`, вывод токенов для тёмной и
+  светлой темы, подстановка `@токенов`, аварийный разбор своего CSS, сборка
+  итогового стиля (не остаётся неподставленных токенов), плюс проверки
+  контраста по WCAG для каждой встроенной темы
+- `charts_test` — движок «Обзора» на фикстурах: ответы чартов Deezer и Apple
+  (включая запасное фото исполнителя, `durationInMillis`, `100x100bb` →
+  `600x600bb`), ответы с ошибкой и битый JSON, ссылки и ограничения источников,
+  справочники жанров и стран, запросы «исполнитель — название», записи yt-dlp →
+  строки чарта и чтение чарта SoundCloud через заглушку yt-dlp
+- `ui_test` (offscreen) — каркас окна, связь плейлиста с представлением,
+  добавление/удаление/очистка, сдвиг индексов, применение всех встроенных тем
+  на живом окне, свой CSS, аварийное `Ctrl+Alt+Shift+C`, полки «Обзора» на
+  подставленных строках чарта (роли, длительности, маршрутизация «исполнитель —
+  название», ссылка превью); тест заодно сохраняет скриншоты
 
 Отключить тесты: `-DFLACORE_BUILD_TESTS=OFF`.
+
+### Живой прогон (сеть, вручную)
+
+`tests/live_probe.cpp` собирается, но **не** регистрируется в `ctest`: ему нужны
+настоящая сеть и настоящий `yt-dlp`. Он поднимает всё окно и проверяет то, что
+фикстурами не проверить: приходят ли чарты Deezer и Apple, играет ли поток
+превью, превращается ли строка чарта в скачанный файл в плейлисте и отвечает ли
+чарт SoundCloud.
+
+```bash
+cd build/tests
+FLACORE_LIVE_YTDLP=/path/to/yt-dlp ./live_probe.exe
+```
 
 ### Структура проекта
 
@@ -745,20 +963,37 @@ ctest --test-dir build --output-on-failure
 FLACORE/
 ├── CMakeLists.txt                # поиск Qt6, опциональные libav*, тесты
 ├── src/
-│   ├── main.cpp                  # QApplication + MainWindow
-│   ├── CMakeLists.txt            # qt_add_executable, /W3 или -Wall -Wextra
+│   ├── main.cpp                  # QApplication, --no-custom-css, ThemeManager
+│   ├── CMakeLists.txt            # flacore_lib + qt_add_executable, -Wall -Wextra
+│   ├── resources.qrc             # встроенные темы (theme.json + theme.qss)
 │   ├── core/
-│   │   ├── player/Playlist.*     # Track, список, текущий индекс, сигналы
+│   │   ├── media/                # MediaTags (теги FLAC/MP3/WAV, обложка), CoverPalette
+│   │   ├── online/               # Charts (чарты Deezer/Apple, парсеры), CoverLoader
+│   │   ├── player/Playlist.*      # Track, список, текущий индекс, сигналы
 │   │   └── ytdlp/
 │   │       ├── YtDlpTypes.h      # YtDlpResult, formatDuration()
 │   │       └── YtDlp.*           # QProcess: search/download/cancel
+│   ├── themes/<id>/              # встроенные темы: theme.json + theme.qss
 │   └── ui/
-│       ├── MainWindow.*          # транспорт, плейлист, вкладки, меню
+│       ├── MainWindow.*          # каркас: шапка, сайдбар, страницы, панель плеера
 │       ├── YouTubePanel.*        # поиск, прогресс, кнопки «Слушать»/«В библиотеку»
-│       └── YtDlpSettingsDialog.* # пути к бинарникам, библиотека, формат
+│       ├── YtDlpSettingsForm.*   # форма настроек yt-dlp (общая)
+│       ├── YtDlpSettingsDialog.* # та же форма в виде диалога
+│       ├── theme/                # Theme, StyleSheet, ThemeManager, ThemeUtil
+│       ├── pages/                # страницы: обзор, библиотека, оформление, темы, yt-dlp
+│       └── widgets/              # AuroraBackdrop, GlassPanel, CoverArt, SeekBar,
+│                                 # TitleBar, PlayerBar, TrackDelegate, ShelfDelegate,
+│                                 # Icons
+├── themes/example/               # своя тема для копирования (см. docs/THEMES.md)
+├── docs/THEMES.md                # формат тем, токены, хуки, свой CSS
 ├── tests/
 │   ├── fake_ytdlp.cpp            # заглушка с тем же CLI-контрактом
-│   ├── ytdlp_test.cpp            # 39 проверок без сети
+│   ├── ytdlp_test.cpp            # обёртка yt-dlp, без сети
+│   ├── media_test.cpp            # теги и палитра обложки на синтетических фикстурах
+│   ├── theme_test.cpp            # theme.json, токены, свой CSS
+│   ├── charts_test.cpp           # чарты, парсеры, записи yt-dlp (фикстуры)
+│   ├── ui_test.cpp               # интерфейс в offscreen + скриншоты
+│   ├── live_probe.cpp            # ручной прогон с настоящей сетью и yt-dlp
 │   └── CMakeLists.txt
 ├── LICENSE                       # GPL-3.0
 ├── GIT_GUIDE.md                  # как вести репозиторий (по-русски)
@@ -766,45 +1001,57 @@ FLACORE/
 ```
 
 Правило слоёв: `core/` ничего не знает о виджетах, `ui/` никогда не запускает
-процессы напрямую. `YouTubePanel` отдаёт наружу `playRequested(path)` /
-`fileAdded(path)`, а `MainWindow` решает, что делать с файлом.
+процессы напрямую. `core/` и `ui/` собираются в статическую библиотеку
+`flacore_lib`, поэтому тесты линкуют ровно тот же код, что и приложение.
+Состоянием владеет `Playlist` и сообщает о нём сигналами; страницы только
+показывают его и передают намерения пользователя.
 
 ### Ограничения
 
 Честный список — это реальные вещи, а не гипотетические:
 
-- **Нет автоперехода.** Воспроизведение останавливается на конце текущего трека;
-  следующий запускается только кнопкой «Следующий» или двойным кликом
-  (`mediaStatusChanged` / `EndOfMedia` пока не подключены).
-- **Нет чтения тегов.** Артист, обложка и длительность из файлов игнорируются,
-  в плейлисте — имя файла. `Track::artist` всегда `"Unknown"`.
 - **Плейлист живёт в памяти.** Нет импорта/экспорта M3U, нет сохранения между
   запусками.
 - **Нет shuffle / repeat / очереди.**
-- **Удаление трека выше текущего** сдвигает индекс модели, не уведомляя
-  представление — выделение может указывать не на ту строку.
 - **Нет медиаклавиш, MPRIS и значка в трее.**
 - **Нет упаковки.** Ни AppImage, ни Flatpak, ни MSI, ни `.desktop`.
+- **«Стекло» — не настоящий backdrop-фильтр.** Qt Widgets не умеет размывать то,
+  что находится за виджетом, поэтому панели полупрозрачные, а размывается сама
+  картинка фона. Выглядит близко, стоит дёшево.
+- **Теги читаются только для FLAC/MP3/WAV.** M4A/AAC/OGG показывают имя файла.
 - **YouTube может быть недоступен** из вашей сети (например, из России без
   прокси). Используйте источник SoundCloud или добавьте `--proxy` в конфиг
   самого `yt-dlp`.
+- **Чарты берутся из публичных недокументированных источников** (Deezer, RSS
+  Apple Marketing Tools). Ключ не нужен — в этом и слабость: форматы могут
+  поменяться без предупреждения, а сами адреса — блокироваться.
+- **Чарт SoundCloud читается через `yt-dlp`.** Из ряда регионов (в том числе из
+  России) `soundcloud.com/charts` отвечает 404, поэтому эта полка показывает
+  ошибку; полки Deezer и Apple при этом работают.
+- **Подборка не персонализирована.** Ни лайков, ни истории прослушиваний, ни
+  рекомендаций — только чарты.
 
 ### Планы
 
-- [ ] автопереход и нормальный конечный автомат транспорта (`updateTransportState()`)
+- [x] автопереход и нормальное состояние транспорта (`refreshTransport()`, `EndOfMedia`)
 - [ ] `PlaylistModel : QAbstractListModel` + `QListView` (drag & drop, роли)
-- [ ] чтение тегов и обложек (libavformat или taglib), сканирование фонотеки
+- [x] чтение тегов и обложек (FLAC/MP3/WAV), акцент из палитры обложки
+- [x] система тем: пакеты, токены, свой CSS, аварийный выход — см. `docs/THEMES.md`
+- [x] раздел «Обзор»: живые чарты (Deezer / Apple Music / SoundCloud через yt-dlp)
+- [ ] персональная подборка: лайки, история, рекомендации
+- [ ] превью на 30 секунд прямо на странице «Обзор» (сейчас играет в общей панели)
 - [ ] сохранение/загрузка M3U, shuffle, repeat
 - [ ] очередь скачивания вместо одной задачи
 - [ ] MPRIS2 + медиаклавиши, значок в трее
-- [ ] GitHub Actions: сборка на Linux + тесты
+- [ ] GitHub Actions: сборка на Linux + четыре тестовых бинарника
 - [ ] упаковка: AppImage / Flatpak / установщик для Windows
 
 ### Решение проблем
 
-**«yt-dlp не найден»** — бинарника нет в `PATH`. Укажите полный путь в
-«Инструменты → Настройки yt-dlp…». На Windows `pip install` кладёт его в
-`%LOCALAPPDATA%\Programs\Python\Python3xx\Scripts`, а этой папки часто нет в `PATH`.
+**«yt-dlp не найден»** — бинарника нет в `PATH`. Укажите полный путь в разделе
+«yt-dlp» слева (или «Меню → Настройки yt-dlp…»). На Windows `pip install` кладёт
+его в `%LOCALAPPDATA%\Programs\Python\Python3xx\Scripts`, а этой папки часто нет
+в `PATH`.
 
 **Скачивание идёт, сохранение в FLAC падает** — нет `ffmpeg`. Установите его или
 укажите папку в настройках. Текст ошибки `yt-dlp` показывается под полосой
@@ -826,6 +1073,17 @@ FLACORE/
 
 **`CXX compiler identification is unknown` на Windows** — Visual Studio без
 Windows SDK либо компилятора нет вообще. Используйте путь через MSYS2.
+
+**Полки чартов пустые / «Deezer недоступен»** — приложение не смогло связаться с
+источниками чартов. Проверьте интернет, прокси/VPN, либо запускайте с
+`FLACORE_OFFLINE=1`, если сеть не нужна осознанно. Если полка SoundCloud даёт 404,
+а Deezer работает — это блокировка SoundCloud для вашего региона, а не ошибка.
+
+**Строка чарта играет не тот трек или не играет** — строка превращается в поиск
+«исполнитель — название» на источнике, выбранном на вкладке YouTube. Если первый
+найденный трек под DRM, приложение само пробует следующие (до трёх), а затем
+другой источник. Если не вышло совсем — «Открыть страницу трека» и вставьте
+ссылку в поле поиска.
 
 **Прогресс стоит на 0 %** — `yt-dlp` не сообщил `total_bytes_estimate` (частое
 дело для HLS). Полоса остаётся в режиме «занято», итоговый путь всё равно

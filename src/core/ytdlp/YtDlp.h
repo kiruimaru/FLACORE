@@ -81,6 +81,13 @@ public:
     void download(const QString &url, const QString &outputDir,
                   const QString &audioFormat = QString(), bool embedMetadata = true);
 
+    /**
+     * Разбор плейлиста или чарта по ссылке (без скачивания).
+     * В отличие от search() не ставит --no-playlist и ограничивает число
+     * записей: так же читаются чарты SoundCloud.
+     */
+    void browse(const QString &url, int limit = 30);
+
     /** Прерывает текущую операцию; придёт сигнал cancelled(). */
     void cancel();
 

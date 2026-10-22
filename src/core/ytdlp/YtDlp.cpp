@@ -138,7 +138,29 @@ void YtDlp::search(const QString &query, int limit, Provider provider)
     args << QStringLiteral("--dump-single-json")
          << QStringLiteral("--flat-playlist")
          << QStringLiteral("--skip-download")
-         << QStringLiteral("--no-warnings");
+         << QStringLiteral("--no-warnings")
+         // Заблокированный сайт должен падать по таймауту, а не держать интерфейс.
+         << QStringLiteral("--socket-timeout") << QStringLiteral("15");
+
+    m_mode = Mode::Searching;
+    startProcess(args);
+}
+
+void YtDlp::browse(const QString &url, int limit)
+{
+    const QString text = url.trimmed();
+    if (text.isEmpty() || isBusy())
+        return;
+
+    QStringList args;
+    args << text
+         << QStringLiteral("--flat-playlist")
+         << QStringLiteral("--dump-single-json")
+         << QStringLiteral("--skip-download")
+         << QStringLiteral("--no-warnings")
+         // Заблокированный сайт должен падать по таймауту, а не держать интерфейс.
+         << QStringLiteral("--socket-timeout") << QStringLiteral("15")
+         << QStringLiteral("--playlist-end") << QString::number(qBound(1, limit, 100));
 
     m_mode = Mode::Searching;
     startProcess(args);
@@ -202,7 +224,7 @@ void YtDlp::cancel()
 void YtDlp::startProcess(const QStringList &args)
 {
     if (m_binary.isEmpty()) {
-        fail(tr("yt-dlp не найден. Укажите путь к yt-dlp в меню «Инструменты → Настройки yt-dlp»."));
+        fail(tr("yt-dlp не найден. Укажите путь к yt-dlp в разделе «yt-dlp» слева."));
         return;
     }
 

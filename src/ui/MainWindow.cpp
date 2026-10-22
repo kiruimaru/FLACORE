@@ -1,395 +1,821 @@
 #include "MainWindow.h"
+
+#include "pages/AppearancePage.h"
+#include "pages/DiscoverPage.h"
+#include "pages/LibraryPage.h"
+#include "pages/YtDlpPage.h"
+#include "theme/ThemeManager.h"
+#include "theme/ThemeUtil.h"
+#include "widgets/AuroraBackdrop.h"
+#include "widgets/GlassWidgets.h"
+#include "widgets/Icons.h"
+#include "widgets/PlayerBar.h"
+#include "widgets/TitleBar.h"
 #include "YouTubePanel.h"
 #include "YtDlpSettingsDialog.h"
+#include "YtDlpSettingsForm.h"
+
+#include "core/online/Charts.h"
+#include "core/player/Playlist.h"
 #include "core/ytdlp/YtDlp.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QFileDialog>
-#include <QStyle>
-#include <QMenuBar>
-#include <QMenu>
+
 #include <QAction>
-#include <QSplitter>
-#include <QTabWidget>
-#include <QStatusBar>
-#include <QDir>
-#include <QFileInfo>
-#include <QDebug>
-#include <QSettings>
+#include <QAudioOutput>
 #include <QDesktopServices>
+#include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QHBoxLayout>
+#include <QImage>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMenu>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QResizeEvent>
+#include <QSettings>
+#include <QShortcut>
+#include <QStackedWidget>
+#include <QTimer>
 #include <QUrl>
+#include <QVBoxLayout>
+#include <QWindow>
+
+namespace {
+
+constexpr int kTopInset = 12;
+
+// Разделы слева: порядок совпадает с порядком страниц в QStackedWidget.
+constexpr int kDiscoverRow = 0;
+constexpr int kLibraryRow = 1;
+constexpr int kYouTubeRow = 2;
+constexpr int kAppearanceRow = 3;
+constexpr int kYtDlpRow = 4;
+constexpr int kNavCount = 5;
+
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent) {
+    : QMainWindow(parent)
+{
+    setWindowTitle(QStringLiteral("FLACORE"));
+    resize(1180, 730);
+    setMinimumSize(940, 600);
 
-    player = new QMediaPlayer(this);
-    audioOutput = new QAudioOutput(this);
-    player->setAudioOutput(audioOutput);
+    m_media = new QMediaPlayer(this);
+    m_audio = new QAudioOutput(this);
+    m_media->setAudioOutput(m_audio);
+    m_playlist = new Playlist(this);
+    m_ytdlp = new YtDlp(this);
 
-    playlist = new Playlist(this);
+    setupUi();
+    setupActions();
+    wireCore();
 
-    ytdlp = new YtDlp(this);
+    // Громкость запоминается между запусками.
+    const int volume = QSettings().value(QStringLiteral("player/volume"), 70).toInt();
+    m_audio->setVolume(volume / 100.0);
+    m_playerBar->setVolume(volume);
 
-    setupUI();
-    createMenuBar();
+    applyFrameless(AppearancePage::framelessEnabled());
+    updateNavIcons();
+    refreshTransport();
 
-    // Connections
-    connect(player, &QMediaPlayer::positionChanged, this, &MainWindow::onPositionChanged);
-    connect(player, &QMediaPlayer::durationChanged, this, &MainWindow::onDurationChanged);
-    connect(playlist, &Playlist::trackAdded, this, &MainWindow::onPlaylistTrackAdded);
-    connect(playlist, &Playlist::currentTrackChanged, this, &MainWindow::onCurrentTrackChanged);
+    m_ytdlp->checkAvailability();
+}
 
-    // yt-dlp: играем скачанное и складываем в плейлист
-    connect(youtubePanel, &YouTubePanel::playRequested, this, &MainWindow::playFile);
-    connect(youtubePanel, &YouTubePanel::fileAdded, this, [this](const QString &path) {
-        for (int i = 0; i < playlist->count(); ++i) {
-            if (playlist->getTrackPath(i) == path) {
-                statusBar()->showMessage(tr("Уже в плейлисте: %1").arg(QFileInfo(path).fileName()), 5000);
-                return;
-            }
+MainWindow::~MainWindow() = default;
+
+void MainWindow::setupUi()
+{
+    m_backdrop = new AuroraBackdrop(this);
+    m_backdrop->setProperty("dataUi", "app");
+    setCentralWidget(m_backdrop);
+
+    auto *outer = new QVBoxLayout(m_backdrop);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(0);
+
+    m_titleBar = new TitleBar(m_backdrop);
+    outer->addWidget(m_titleBar);
+
+    auto *middle = new QHBoxLayout();
+    middle->setContentsMargins(0, 0, 0, 0);
+    middle->setSpacing(0);
+
+    // --- сайдбар -----------------------------------------------------------
+    auto *sidebar = new QWidget(m_backdrop);
+    sidebar->setProperty("dataUi", "sidebar");
+    sidebar->setFixedWidth(ThemeUtil::number(QStringLiteral("sidebar-width"), 216));
+
+    auto *sidebarLayout = new QVBoxLayout(sidebar);
+    sidebarLayout->setContentsMargins(8, 10, 8, 10);
+    sidebarLayout->setSpacing(8);
+
+    m_nav = new QListWidget(sidebar);
+    m_nav->setProperty("dataUi", "sidebar");
+    m_nav->setObjectName(QStringLiteral("sidebarNav"));
+    m_nav->setFrameShape(QFrame::NoFrame);
+    m_nav->setFocusPolicy(Qt::NoFocus);
+    m_nav->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    m_nav->addItem(tr("Обзор"));
+    m_nav->addItem(tr("Библиотека"));
+    m_nav->addItem(tr("YouTube"));
+    m_nav->addItem(tr("Оформление"));
+    m_nav->addItem(tr("yt-dlp"));
+    m_nav->setCurrentRow(0);
+    sidebarLayout->addWidget(m_nav, 1);
+
+    auto *menuButton = new QPushButton(tr("Меню"), sidebar);
+    menuButton->setProperty("variant", "ghost");
+    menuButton->setIcon(Icons::icon(Icons::Kind::Menu,
+                                    ThemeUtil::color(QStringLiteral("text-muted"), Qt::gray), 16));
+    sidebarLayout->addWidget(menuButton);
+
+    middle->addWidget(sidebar);
+
+    // --- страницы ----------------------------------------------------------
+    m_pages = new QStackedWidget(m_backdrop);
+    m_pages->setProperty("dataUi", "main");
+
+    m_discover = new DiscoverPage(m_pages);
+    m_library = new LibraryPage(m_pages);
+    m_youtube = new YouTubePanel(m_ytdlp, m_pages);
+    m_appearance = new AppearancePage(m_pages);
+    m_ytdlpPage = new YtDlpPage(m_pages);
+
+    m_pages->addWidget(m_discover);
+    m_pages->addWidget(m_library);
+    m_pages->addWidget(m_youtube);
+    m_pages->addWidget(m_appearance);
+    m_pages->addWidget(m_ytdlpPage);
+
+    middle->addWidget(m_pages, 1);
+    outer->addLayout(middle, 1);
+
+    // --- панель плеера -----------------------------------------------------
+    auto *playerWrap = new QWidget(m_backdrop);
+    auto *playerLayout = new QVBoxLayout(playerWrap);
+    playerLayout->setContentsMargins(16, 6, 16, 14);
+    playerLayout->setSpacing(0);
+
+    m_playerBar = new PlayerBar(playerWrap);
+    playerLayout->addWidget(m_playerBar);
+    outer->addWidget(playerWrap);
+
+    // --- всплывающие сообщения --------------------------------------------
+    m_toast = new QLabel(m_backdrop);
+    m_toast->setProperty("dataUi", "toast");
+    m_toast->setVisible(false);
+    m_toast->raise();
+
+    m_toastTimer = new QTimer(this);
+    m_toastTimer->setSingleShot(true);
+    m_toastTimer->setInterval(6000);
+    connect(m_toastTimer, &QTimer::timeout, m_toast, &QLabel::hide);
+
+    connect(menuButton, &QPushButton::clicked, this, [this, menuButton]() {
+        onShowMenu(menuButton->mapToGlobal(QPoint(0, -8)));
+    });
+}
+
+void MainWindow::setupActions()
+{
+    auto addWindowAction = [this](const QString &text, const QKeySequence &shortcut,
+                                 const std::function<void()> &handler) -> QAction * {
+        auto *action = new QAction(text, this);
+        if (!shortcut.isEmpty())
+            action->setShortcut(shortcut);
+        connect(action, &QAction::triggered, this, handler);
+        addAction(action);
+        return action;
+    };
+
+    addWindowAction(tr("Открыть файлы"), QKeySequence::Open, [this]() { onOpenFiles(); });
+    addWindowAction(tr("Играть / пауза"), QKeySequence(Qt::Key_Space), [this]() { onPlayPause(); });
+    addWindowAction(tr("Следующий трек"), QKeySequence(Qt::CTRL | Qt::Key_Right),
+                    [this]() { onNext(); });
+    addWindowAction(tr("Предыдущий трек"), QKeySequence(Qt::CTRL | Qt::Key_Left),
+                    [this]() { onPrevious(); });
+    addWindowAction(tr("Стоп"), QKeySequence(Qt::CTRL | Qt::Key_Period), [this]() { onStop(); });
+
+    // Аварийный выход из «своего CSS» — как Ctrl+Alt+Shift+C в SoundCloud Desktop.
+    addWindowAction(tr("Выключить свой CSS и тему"),
+                    QKeySequence(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_C), [this]() {
+                        ThemeManager::instance()->toggleEscapeHatch();
+                        notify(tr("Оформление переключено в безопасный вид (Ctrl+Alt+Shift+C)."));
+                    });
+}
+
+void MainWindow::wireCore()
+{
+    ThemeManager *themes = ThemeManager::instance();
+    if (themes) {
+        connect(themes, &ThemeManager::changed, this, &MainWindow::updateNavIcons);
+        connect(themes, &ThemeManager::problemsChanged, this, [this](const QStringList &problems) {
+            if (!problems.isEmpty())
+                notify(problems.join(QStringLiteral(" · ")), true);
+        });
+    }
+
+    // --- шапка -------------------------------------------------------------
+    connect(m_titleBar, &TitleBar::searchChanged, this, [this](const QString &text) {
+        m_library->setFilter(text);
+    });
+    connect(m_titleBar, &TitleBar::appearanceRequested, this, [this]() {
+        m_nav->setCurrentRow(kAppearanceRow);
+    });
+    connect(m_titleBar, &TitleBar::menuRequested, this, &MainWindow::onShowMenu);
+    connect(m_titleBar, &TitleBar::minimizeRequested, this, [this]() { showMinimized(); });
+    connect(m_titleBar, &TitleBar::maximizeRequested, this, &MainWindow::toggleMaximize);
+    connect(m_titleBar, &TitleBar::closeRequested, this, [this]() { close(); });
+
+    connect(m_nav, &QListWidget::currentRowChanged, this, &MainWindow::onNavChanged);
+
+    // --- библиотека --------------------------------------------------------
+    connect(m_library, &LibraryPage::openFilesRequested, this, &MainWindow::onOpenFiles);
+    connect(m_library, &LibraryPage::clearRequested, this, [this]() {
+        m_playlist->clear();
+        notify(tr("Плейлист очищен"));
+    });
+    connect(m_library, &LibraryPage::removeRequested, this, [this](int row) {
+        if (row >= 0)
+            m_playlist->removeTrack(row);
+    });
+    connect(m_library, &LibraryPage::trackActivated, this, &MainWindow::onTrackActivated);
+    connect(m_library, &LibraryPage::filesDropped, this, [this](const QStringList &paths) {
+        addPaths(paths, true);
+    });
+
+    // --- плеер -------------------------------------------------------------
+    connect(m_playerBar, &PlayerBar::playPauseRequested, this, &MainWindow::onPlayPause);
+    connect(m_playerBar, &PlayerBar::stopRequested, this, &MainWindow::onStop);
+    connect(m_playerBar, &PlayerBar::nextRequested, this, &MainWindow::onNext);
+    connect(m_playerBar, &PlayerBar::previousRequested, this, &MainWindow::onPrevious);
+    connect(m_playerBar, &PlayerBar::seekRequested, this, &MainWindow::onSeek);
+    connect(m_playerBar, &PlayerBar::volumeChanged, this, &MainWindow::onVolumeChanged);
+
+    // --- модель ------------------------------------------------------------
+    connect(m_playlist, &Playlist::trackAdded, this, &MainWindow::onPlaylistTrackAdded);
+    connect(m_playlist, &Playlist::trackRemoved, this, &MainWindow::onPlaylistTrackRemoved);
+    connect(m_playlist, &Playlist::currentTrackChanged, this, &MainWindow::onCurrentTrackChanged);
+    connect(m_playlist, &Playlist::playlistCleared, this, [this]() {
+        m_library->clearRows();
+        m_media->stop();
+        m_playingIndex = -1;
+        m_playerBar->clearTrack();
+        refreshTransport();
+    });
+
+    // --- медиа -------------------------------------------------------------
+    connect(m_media, &QMediaPlayer::positionChanged, this, &MainWindow::onPositionChanged);
+    connect(m_media, &QMediaPlayer::durationChanged, this, &MainWindow::onDurationChanged);
+    connect(m_media, &QMediaPlayer::mediaStatusChanged, this, &MainWindow::onMediaStatusChanged);
+    connect(m_media, &QMediaPlayer::errorOccurred, this, &MainWindow::onMediaError);
+    connect(m_media, &QMediaPlayer::playbackStateChanged, this,
+            [this](QMediaPlayer::PlaybackState state) {
+                m_playerBar->setPlaying(state == QMediaPlayer::PlayingState);
+            });
+
+    // --- yt-dlp ------------------------------------------------------------
+    connect(m_ytdlp, &YtDlp::availabilityChecked, this, [this](bool available, const QString &info) {
+        if (available)
+            notify(tr("yt-dlp %1 — готов").arg(info));
+        else
+            notify(tr("yt-dlp недоступен: %1").arg(info), true);
+    });
+    connect(m_youtube, &YouTubePanel::playRequested, this, [this](const QString &path) {
+        addPaths({path}, false);
+        const int index = m_playlist->getAllPaths().indexOf(path);
+        if (index < 0)
+            return;
+        m_userTransport = true;
+        m_playlist->setCurrentIndex(index);
+        m_userTransport = false;
+        m_media->play();
+    });
+    connect(m_youtube, &YouTubePanel::fileAdded, this, [this](const QString &path) {
+        if (m_playlist->getAllPaths().contains(path)) {
+            notify(tr("Уже в плейлисте: %1").arg(QFileInfo(path).fileName()));
+            return;
         }
-        playlist->addTrack(path);
-        updateButtonStates();
-        statusBar()->showMessage(tr("Добавлено в плейлист: %1").arg(QFileInfo(path).fileName()), 5000);
+        addPaths({path}, false);
+    });
+    connect(m_ytdlpPage, &YtDlpPage::applied, this, [this](const QString &binary) {
+        m_ytdlp->setBinary(binary);
+        m_ytdlp->checkAvailability();
+    });
+    connect(m_ytdlpPage, &YtDlpPage::checkRequested, this, [this]() { m_ytdlp->checkAvailability(); });
+
+    // --- обзор -------------------------------------------------------------
+    connect(m_discover, &DiscoverPage::playRequested, this, [this](const ChartTrack &track) {
+        routeChartTrack(track, false);
+    });
+    connect(m_discover, &DiscoverPage::saveRequested, this, [this](const ChartTrack &track) {
+        routeChartTrack(track, true);
+    });
+    connect(m_discover, &DiscoverPage::previewRequested, this, &MainWindow::playChartPreview);
+    connect(m_discover, &DiscoverPage::soundCloudChartRequested, this,
+            &MainWindow::requestSoundCloudChart);
+
+    // Чарт SoundCloud читается через yt-dlp: результаты забирает тот, кто запустил.
+    connect(m_ytdlp, &YtDlp::searchFinished, this, [this](const QList<YtDlpResult> &results) {
+        if (!m_chartSearchPending)
+            return;
+        m_chartSearchPending = false;
+        addSoundCloudChart(results);
+    });
+    connect(m_ytdlp, &YtDlp::searchFailed, this, [this](const QString &error) {
+        if (!m_chartSearchPending)
+            return;
+        m_chartSearchPending = false;
+        m_discover->setShelfStatus(DiscoverPage::soundCloudShelfId(),
+                                   tr("Чарт SoundCloud недоступен: %1").arg(error), true);
+        m_discover->setJobStatus(tr("Чарт SoundCloud недоступен — из этой сети нужен VPN/прокси"));
     });
 
-    connect(ytdlp, &YtDlp::availabilityChecked, this, [this](bool available, const QString &info) {
-        statusBar()->showMessage(available ? tr("yt-dlp %1 — готов").arg(info)
-                                           : tr("yt-dlp недоступен: %1").arg(info),
-                                 8000);
-    });
-    ytdlp->checkAvailability();
+    // --- оформление --------------------------------------------------------
+    connect(m_appearance, &AppearancePage::framelessToggled, this, &MainWindow::setFrameless);
 }
 
-MainWindow::~MainWindow() {}
+// --- разделы ----------------------------------------------------------------
 
-void MainWindow::setupUI() {
-    centralWidget = new QWidget(this);
-    setCentralWidget(centralWidget);
-
-    setWindowTitle("FLACORE Music Player v0.3");
-    resize(1000, 640);
-
-    // Main layout - horizontal splitter
-    QSplitter *splitter = new QSplitter(Qt::Horizontal, centralWidget);
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->addWidget(splitter);
-
-    // Left panel - Player controls
-    QWidget *leftPanel = new QWidget();
-    QVBoxLayout *leftLayout = new QVBoxLayout(leftPanel);
-
-    fileLabel = new QLabel("No file loaded");
-    fileLabel->setAlignment(Qt::AlignCenter);
-    fileLabel->setStyleSheet("font-size: 14px; font-weight: bold; margin: 10px;");
-    leftLayout->addWidget(fileLabel);
-
-    // Progress slider
-    progressSlider = new QSlider(Qt::Horizontal);
-    progressSlider->setRange(0, 0);
-    progressSlider->setEnabled(false);
-    connect(progressSlider, &QSlider::sliderMoved, this, &MainWindow::onSeek);
-    leftLayout->addWidget(progressSlider);
-
-    // Time labels
-    QHBoxLayout *timeLayout = new QHBoxLayout();
-    currentTimeLabel = new QLabel("00:00");
-    totalTimeLabel = new QLabel("00:00");
-    timeLayout->addWidget(currentTimeLabel);
-    timeLayout->addStretch();
-    timeLayout->addWidget(totalTimeLabel);
-    leftLayout->addLayout(timeLayout);
-
-    // Control buttons
-    QHBoxLayout *controlLayout = new QHBoxLayout();
-
-    openButton = new QPushButton();
-    openButton->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
-    openButton->setFixedSize(50, 50);
-    connect(openButton, &QPushButton::clicked, this, &MainWindow::onOpenFiles);
-
-    previousButton = new QPushButton();
-    previousButton->setIcon(style()->standardIcon(QStyle::SP_MediaSkipBackward));
-    previousButton->setFixedSize(50, 50);
-    previousButton->setEnabled(false);
-    connect(previousButton, &QPushButton::clicked, this, &MainWindow::onPrevious);
-
-    playButton = new QPushButton();
-    playButton->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
-    playButton->setFixedSize(50, 50);
-    playButton->setEnabled(false);
-    connect(playButton, &QPushButton::clicked, this, &MainWindow::onPlay);
-
-    pauseButton = new QPushButton();
-    pauseButton->setIcon(style()->standardIcon(QStyle::SP_MediaPause));
-    pauseButton->setFixedSize(50, 50);
-    pauseButton->setEnabled(false);
-    connect(pauseButton, &QPushButton::clicked, this, &MainWindow::onPause);
-
-    stopButton = new QPushButton();
-    stopButton->setIcon(style()->standardIcon(QStyle::SP_MediaStop));
-    stopButton->setFixedSize(50, 50);
-    stopButton->setEnabled(false);
-    connect(stopButton, &QPushButton::clicked, this, &MainWindow::onStop);
-
-    nextButton = new QPushButton();
-    nextButton->setIcon(style()->standardIcon(QStyle::SP_MediaSkipForward));
-    nextButton->setFixedSize(50, 50);
-    nextButton->setEnabled(false);
-    connect(nextButton, &QPushButton::clicked, this, &MainWindow::onNext);
-
-    controlLayout->addStretch();
-    controlLayout->addWidget(openButton);
-    controlLayout->addWidget(previousButton);
-    controlLayout->addWidget(playButton);
-    controlLayout->addWidget(pauseButton);
-    controlLayout->addWidget(stopButton);
-    controlLayout->addWidget(nextButton);
-    controlLayout->addStretch();
-    leftLayout->addLayout(controlLayout);
-
-    // Volume control
-    QHBoxLayout *volumeLayout = new QHBoxLayout();
-    QLabel *volumeLabel = new QLabel("Volume:");
-    volumeSlider = new QSlider(Qt::Horizontal);
-    volumeSlider->setRange(0, 100);
-    volumeSlider->setValue(50);
-    audioOutput->setVolume(0.5);
-    connect(volumeSlider, &QSlider::valueChanged, this, &MainWindow::onVolumeChanged);
-    volumeLayout->addWidget(volumeLabel);
-    volumeLayout->addWidget(volumeSlider);
-    leftLayout->addLayout(volumeLayout);
-
-    leftLayout->addStretch();
-
-    // Right panel - tabs: playlist / YouTube
-    QWidget *rightPanel = new QWidget();
-    QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
-
-    playlistWidget = new QListWidget();
-    playlistWidget->setObjectName(QStringLiteral("playlistWidget"));
-    playlistWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-    connect(playlistWidget, &QListWidget::itemDoubleClicked, this, &MainWindow::onTrackDoubleClicked);
-
-    // Playlist buttons
-    QHBoxLayout *playlistButtonLayout = new QHBoxLayout();
-    removeTrackButton = new QPushButton("Remove");
-    clearPlaylistButton = new QPushButton("Clear All");
-    connect(removeTrackButton, &QPushButton::clicked, this, &MainWindow::onRemoveTrack);
-    connect(clearPlaylistButton, &QPushButton::clicked, this, &MainWindow::onClearPlaylist);
-    playlistButtonLayout->addWidget(removeTrackButton);
-    playlistButtonLayout->addWidget(clearPlaylistButton);
-
-    QWidget *playlistTab = new QWidget();
-    QVBoxLayout *playlistTabLayout = new QVBoxLayout(playlistTab);
-    playlistTabLayout->setContentsMargins(4, 4, 4, 4);
-    playlistTabLayout->addWidget(playlistWidget, 1);
-    playlistTabLayout->addLayout(playlistButtonLayout);
-
-    youtubePanel = new YouTubePanel(ytdlp, this);
-
-    QTabWidget *rightTabs = new QTabWidget();
-    rightTabs->addTab(playlistTab, "Playlist");
-    rightTabs->addTab(youtubePanel, "YouTube");
-    rightLayout->addWidget(rightTabs);
-
-    // Add panels to splitter
-    splitter->addWidget(leftPanel);
-    splitter->addWidget(rightPanel);
-    splitter->setStretchFactor(0, 2);
-    splitter->setStretchFactor(1, 1);
+void MainWindow::onNavChanged(int row)
+{
+    if (row < 0 || row >= m_pages->count())
+        return;
+    m_pages->setCurrentIndex(row);
+    updateNavIcons();
 }
 
-void MainWindow::createMenuBar() {
-    QMenu *fileMenu = menuBar()->addMenu("File");
-
-    QAction *openAction = new QAction("Open Files", this);
-    openAction->setShortcut(QKeySequence::Open);
-    connect(openAction, &QAction::triggered, this, &MainWindow::onOpenFiles);
-    fileMenu->addAction(openAction);
-
-    QAction *quitAction = new QAction("Quit", this);
-    quitAction->setShortcut(QKeySequence::Quit);
-    connect(quitAction, &QAction::triggered, this, &QMainWindow::close);
-    fileMenu->addAction(quitAction);
-
-    // yt-dlp
-    QMenu *toolsMenu = menuBar()->addMenu(tr("Инструменты"));
-
-    QAction *openYtDlpSettings = new QAction(tr("Настройки yt-dlp…"), this);
-    connect(openYtDlpSettings, &QAction::triggered, this, &MainWindow::onYtDlpSettings);
-    toolsMenu->addAction(openYtDlpSettings);
-
-    QAction *openLibrary = new QAction(tr("Открыть папку библиотеки"), this);
-    connect(openLibrary, &QAction::triggered, this, []() {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(YtDlp::libraryDir()));
-    });
-    toolsMenu->addAction(openLibrary);
-}
-
-void MainWindow::onOpenFiles() {
-    QStringList files = QFileDialog::getOpenFileNames(this,
-        "Select Audio Files", QDir::homePath(),
-        "Audio Files (*.mp3 *.wav *.flac *.ogg *.m4a *.aac)");
-
-    if (!files.isEmpty()) {
-        playlist->addTracks(files);
-        updateButtonStates();
-    }
-}
-
-void MainWindow::onPlay() {
-    player->play();
-    playButton->setEnabled(false);
-    pauseButton->setEnabled(true);
-}
-
-void MainWindow::onPause() {
-    player->pause();
-    playButton->setEnabled(true);
-    pauseButton->setEnabled(false);
-}
-
-void MainWindow::onStop() {
-    player->stop();
-    playButton->setEnabled(true);
-    pauseButton->setEnabled(false);
-    progressSlider->setValue(0);
-}
-
-void MainWindow::onNext() {
-    if (playlist->hasNext()) {
-        playlist->next();
-        loadTrack(playlist->currentIndex());
-        player->play();
-    }
-}
-
-void MainWindow::onPrevious() {
-    if (playlist->hasPrevious()) {
-        playlist->previous();
-        loadTrack(playlist->currentIndex());
-        player->play();
-    }
-}
-
-void MainWindow::onTrackDoubleClicked(QListWidgetItem *item) {
-    int index = playlistWidget->row(item);
-    playlist->setCurrentIndex(index);
-    loadTrack(index);
-    player->play();
-}
-
-void MainWindow::onRemoveTrack() {
-    int currentRow = playlistWidget->currentRow();
-    if (currentRow >= 0) {
-        playlist->removeTrack(currentRow);
-        delete playlistWidget->takeItem(currentRow);
-        updateButtonStates();
-    }
-}
-
-void MainWindow::onClearPlaylist() {
-    playlist->clear();
-    playlistWidget->clear();
-    player->stop();
-    fileLabel->setText("No file loaded");
-    updateButtonStates();
-}
-
-void MainWindow::onPositionChanged(qint64 position) {
-    if (!progressSlider->isSliderDown()) {
-        progressSlider->setValue(position);
-    }
-    int seconds = (position / 1000) % 60;
-    int minutes = (position / 1000) / 60;
-    currentTimeLabel->setText(QString::asprintf("%02d:%02d", minutes, seconds));
-}
-
-void MainWindow::onDurationChanged(qint64 duration) {
-    progressSlider->setRange(0, duration);
-    progressSlider->setEnabled(duration > 0);
-    int seconds = (duration / 1000) % 60;
-    int minutes = (duration / 1000) / 60;
-    totalTimeLabel->setText(QString::asprintf("%02d:%02d", minutes, seconds));
-}
-
-void MainWindow::onVolumeChanged(int value) {
-    audioOutput->setVolume(value / 100.0);
-}
-
-void MainWindow::onSeek(int position) {
-    player->setPosition(position);
-}
-
-void MainWindow::onPlaylistTrackAdded(int index) {
-    Track track = playlist->getTrack(index);
-    playlistWidget->addItem(track.title);
-}
-
-void MainWindow::onCurrentTrackChanged(int index) {
-    playlistWidget->setCurrentRow(index);
-    updateButtonStates();
-}
-
-void MainWindow::loadTrack(int index) {
-    QString path = playlist->getTrackPath(index);
-    if (!path.isEmpty()) {
-        player->setSource(QUrl::fromLocalFile(path));
-        Track track = playlist->getTrack(index);
-        fileLabel->setText(track.title);
-        playButton->setEnabled(true);
-        stopButton->setEnabled(true);
-    }
-}
-
-void MainWindow::updateButtonStates() {
-    bool hasItems = playlist->count() > 0;
-    playButton->setEnabled(hasItems);
-    stopButton->setEnabled(hasItems);
-    nextButton->setEnabled(playlist->hasNext());
-    previousButton->setEnabled(playlist->hasPrevious());
-}
-
-// Загружает локальный файл (в т.ч. скачанный yt-dlp) и сразу включает его.
-void MainWindow::playFile(const QString &path) {
-    if (path.isEmpty())
+void MainWindow::updateNavIcons()
+{
+    if (!m_nav)
         return;
 
-    int index = -1;
-    for (int i = 0; i < playlist->count(); ++i) {
-        if (playlist->getTrackPath(i) == path) {
-            index = i;
-            break;
-        }
-    }
-    if (index < 0) {
-        playlist->addTrack(path);
-        index = playlist->count() - 1;
-    }
+    const Icons::Kind kinds[] = {Icons::Kind::Discover, Icons::Kind::Library, Icons::Kind::YouTube, Icons::Kind::Palette,
+                                     Icons::Kind::Settings };
+    const QColor normal = ThemeUtil::color(QStringLiteral("text-muted"), QColor(0xa0, 0xa6, 0xb4));
+    QColor active = ThemeUtil::color(QStringLiteral("accent"), QColor(0xff, 0x55, 0x00));
+    // На светлых темах чистый акцент слишком бледный для текста и иконок.
+    if (ThemeUtil::isLight())
+        active = active.darker(140);
 
-    playlist->setCurrentIndex(index);
-    loadTrack(index);
-    player->play();
-
-    playButton->setEnabled(false);
-    pauseButton->setEnabled(true);
-    progressSlider->setValue(0);
+    for (int i = 0; i < m_nav->count() && i < kNavCount; ++i) {
+        const bool current = (i == m_nav->currentRow());
+        m_nav->item(i)->setIcon(Icons::icon(kinds[i], current ? active : normal, 18));
+    }
 }
 
-void MainWindow::onYtDlpSettings() {
+// --- транспорт --------------------------------------------------------------
+
+void MainWindow::onOpenFiles()
+{
+    const QStringList files = QFileDialog::getOpenFileNames(
+        this, tr("Выберите аудиофайлы"), QDir::homePath(),
+        tr("Аудио (*.flac *.mp3 *.wav *.ogg *.m4a *.aac *.opus);;Все файлы (*)"));
+    if (files.isEmpty())
+        return;
+    addPaths(files, false);
+}
+
+void MainWindow::addPaths(const QStringList &paths, bool fromDrop)
+{
+    const QStringList existing = m_playlist->getAllPaths();
+
+    QStringList fresh;
+    int duplicates = 0;
+    for (const QString &path : paths) {
+        if (existing.contains(path) || fresh.contains(path)) {
+            ++duplicates;
+            continue;
+        }
+        fresh << path;
+    }
+
+    if (fresh.isEmpty()) {
+        notify(duplicates > 0 ? tr("Всё это уже в плейлисте") : tr("Нечего добавить"));
+        return;
+    }
+
+    m_playlist->addTracks(fresh);
+
+    QString message = fromDrop ? tr("Добавлено перетаскиванием: %1").arg(fresh.size())
+                               : tr("Добавлено: %1").arg(fresh.size());
+    if (duplicates > 0)
+        message += tr(" (пропущено дублей: %1)").arg(duplicates);
+    if (m_playingIndex < 0) {
+        m_playlist->setCurrentIndex(0);
+        m_media->play();
+    }
+    notify(message);
+}
+
+void MainWindow::onPlayPause()
+{
+    if (m_media->playbackState() == QMediaPlayer::PlayingState) {
+        m_media->pause();
+        return;
+    }
+    if (m_playingIndex < 0 && m_playlist->count() > 0) {
+        m_playlist->setCurrentIndex(0);
+        loadTrack(0, true);
+        return;
+    }
+    m_media->play();
+}
+
+void MainWindow::onStop()
+{
+    m_media->stop();
+    m_playerBar->setPlaying(false);
+    m_playerBar->setPosition(0, m_media->duration());
+}
+
+void MainWindow::onNext()
+{
+    if (!m_playlist->hasNext())
+        return;
+    m_userTransport = true;
+    m_playlist->next();
+    m_userTransport = false;
+    m_media->play();
+}
+
+void MainWindow::onPrevious()
+{
+    if (!m_playlist->hasPrevious())
+        return;
+    m_userTransport = true;
+    m_playlist->previous();
+    m_userTransport = false;
+    m_media->play();
+}
+
+void MainWindow::onTrackActivated(int row)
+{
+    if (row < 0)
+        return;
+    m_userTransport = true;
+    m_playlist->setCurrentIndex(row);
+    m_userTransport = false;
+    m_media->play();
+}
+
+void MainWindow::onSeek(int positionMs)
+{
+    m_media->setPosition(positionMs);
+}
+
+void MainWindow::onVolumeChanged(int value)
+{
+    m_audio->setVolume(value / 100.0);
+    QSettings().setValue(QStringLiteral("player/volume"), value);
+}
+
+void MainWindow::onPositionChanged(qint64 position)
+{
+    m_playerBar->setPosition(position, m_media->duration());
+}
+
+void MainWindow::onDurationChanged(qint64 duration)
+{
+    m_playerBar->setPosition(m_media->position(), duration);
+}
+
+void MainWindow::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
+{
+    switch (status) {
+    case QMediaPlayer::EndOfMedia:
+        if (m_previewPlaying) {
+            // Играло превью из чарта — плейлист не трогаем.
+            m_previewPlaying = false;
+            m_media->stop();
+            m_playerBar->setPlaying(false);
+            break;
+        }
+        // Автопереход: раньше плейлист останавливался на первом же треке.
+        if (m_playlist->hasNext()) {
+            onNext();
+        } else {
+            m_playerBar->setPlaying(false);
+            m_media->stop();
+        }
+        break;
+    case QMediaPlayer::InvalidMedia:
+        notify(tr("Файл не читается: %1").arg(QFileInfo(m_playlist->getTrackPath(m_playingIndex))
+                                                  .fileName()),
+               true);
+        break;
+    default:
+        break;
+    }
+}
+
+void MainWindow::onMediaError(QMediaPlayer::Error error, const QString &errorString)
+{
+    if (error == QMediaPlayer::NoError)
+        return;
+
+    QString text = errorString.trimmed();
+    if (text.isEmpty())
+        text = tr("неизвестная ошибка воспроизведения");
+    const QString name = QFileInfo(m_playlist->getTrackPath(m_playingIndex)).fileName();
+    notify(name.isEmpty() ? text : tr("%1: %2").arg(name, text), true);
+}
+
+// --- модель → представление -------------------------------------------------
+
+void MainWindow::onPlaylistTrackAdded(int index)
+{
+    const Track track = m_playlist->getTrack(index);
+    m_library->addTrack(track.title, track.artist, track.durationText(), track.album);
+    refreshTransport();
+}
+
+void MainWindow::onPlaylistTrackRemoved(int index)
+{
+    m_library->removeRow(index);
+    if (index == m_playingIndex)
+        m_playingIndex = -1;
+    refreshTransport();
+}
+
+void MainWindow::onCurrentTrackChanged(int index)
+{
+    m_library->setPlayingRow(index);
+
+    if (index < 0) {
+        m_media->stop();
+        m_playerBar->clearTrack();
+        m_playingIndex = -1;
+        refreshTransport();
+        return;
+    }
+
+    const bool autoplay = m_userTransport
+                          || m_media->playbackState() == QMediaPlayer::PlayingState;
+    loadTrack(index, autoplay);
+}
+
+void MainWindow::loadTrack(int index, bool autoplay)
+{
+    m_previewPlaying = false;
+
+    const Track track = m_playlist->getTrack(index);
+    if (track.filePath.isEmpty())
+        return;
+
+    // Если играет тот же файл (например, индекс сдвинулся после удаления трека
+    // выше), источник не переставляем — иначе трек начнётся с начала.
+    const bool sameSource = m_media->source() == QUrl::fromLocalFile(track.filePath);
+
+    m_playingIndex = index;
+    if (!sameSource) {
+        m_media->setSource(QUrl::fromLocalFile(track.filePath));
+        m_playerBar->setTrack(track.title, track.artist, track.durationMs, track.cover);
+    }
+
+    m_playerBar->setControlsEnabled(true);
+    m_library->setPlayingRow(index);
+    refreshTransport();
+
+    if (autoplay && m_media->playbackState() != QMediaPlayer::PlayingState)
+        m_media->play();
+
+    // Акцент из обложки — как «Cover Colors» в SoundCloud Desktop.
+    if (!track.cover.isNull() && !sameSource)
+        ThemeManager::instance()->applyCoverPalette(track.cover);
+}
+
+void MainWindow::refreshTransport()
+{
+    m_playerBar->setNavigationEnabled(m_playlist->hasPrevious(), m_playlist->hasNext());
+    m_playerBar->setControlsEnabled(m_playingIndex >= 0 || m_playlist->count() > 0);
+}
+
+// --- обзор (живая подборка) -------------------------------------------------
+
+void MainWindow::routeChartTrack(const ChartTrack &track, bool saveToLibrary)
+{
+    const QString query = track.searchQuery();
+    if (query.isEmpty()) {
+        notify(tr("У этой строки чарта нет названия — искать нечего"), true);
+        return;
+    }
+
+    if (YtDlp::resolveBinary().isEmpty()) {
+        notify(tr("yt-dlp не найден — укажите путь в разделе «yt-dlp» слева"), true);
+        m_discover->setJobStatus(tr("yt-dlp не найден"));
+        return;
+    }
+
+    if (m_ytdlp->isBusy()) {
+        notify(tr("yt-dlp занят — дождитесь окончания операции"), true);
+        return;
+    }
+
+    // Строка чарта превращается в обычный запрос на вкладке YouTube: там виден
+    // прогресс, а плеер получает готовый файл штатным путём.
+    m_youtube->runQuery(query, -1, saveToLibrary);
+    m_nav->setCurrentRow(kYouTubeRow);
+    notify(saveToLibrary ? tr("Сохраняю в библиотеку: %1").arg(query)
+                         : tr("Ищу для прослушивания: %1").arg(query));
+}
+
+void MainWindow::playChartPreview(const ChartTrack &track)
+{
+    if (track.previewUrl.isEmpty()) {
+        notify(tr("У этого трека нет превью — слушайте через yt-dlp"), true);
+        return;
+    }
+
+    m_previewPlaying = true;
+    m_media->setSource(QUrl(track.previewUrl));
+    m_playerBar->setTrack(track.title, track.artist, track.durationMs, QImage());
+    m_playerBar->setControlsEnabled(true);
+    m_media->play();
+    notify(tr("Превью: %1 — %2").arg(track.artist, track.title));
+}
+
+void MainWindow::requestSoundCloudChart(const QString &url)
+{
+    if (YtDlp::resolveBinary().isEmpty()) {
+        m_discover->setShelfStatus(DiscoverPage::soundCloudShelfId(),
+                                   tr("yt-dlp не найден — укажите путь в разделе «yt-dlp»"), true);
+        return;
+    }
+
+    if (m_ytdlp->isBusy()) {
+        m_discover->setShelfStatus(DiscoverPage::soundCloudShelfId(),
+                                   tr("yt-dlp занят другой задачей — повторите позже"), true);
+        return;
+    }
+
+    m_chartSearchPending = true;
+    m_ytdlp->browse(url, 30);
+}
+
+void MainWindow::addSoundCloudChart(const QList<YtDlpResult> &results)
+{
+    if (results.isEmpty()) {
+        m_discover->setShelfStatus(DiscoverPage::soundCloudShelfId(),
+                                   tr("Чарт SoundCloud пуст — похоже, сервис недоступен"),
+                                   true);
+        return;
+    }
+
+    const QList<ChartTrack> tracks = chartTracksFromYtDlp(results);
+
+    DiscoverPage::Shelf shelf;
+    shelf.id = DiscoverPage::soundCloudShelfId();
+    shelf.title = tr("Чарт SoundCloud");
+    shelf.subtitle = tr("%1 треков из чарта SoundCloud").arg(tracks.size());
+    shelf.tracks = tracks;
+    m_discover->addShelf(shelf);
+    m_discover->setJobStatus(tr("Чарт SoundCloud: %1 треков").arg(tracks.size()));
+}
+
+// --- меню и окно ------------------------------------------------------------
+
+void MainWindow::onShowMenu(const QPoint &globalPos)
+{
+    QMenu menu(this);
+    menu.addAction(tr("Открыть файлы…"), QKeySequence::Open, this, &MainWindow::onOpenFiles);
+    menu.addAction(tr("Настройки yt-dlp…"), this, &MainWindow::onYtDlpSettings);
+    menu.addSeparator();
+    menu.addAction(tr("Открыть папку библиотеки"), this, []() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(YtDlp::libraryDir()));
+    });
+    menu.addAction(tr("Открыть папку тем"), this, []() {
+        ThemeManager::instance()->openThemesFolder();
+    });
+    menu.addAction(tr("Раздел «Оформление»"), this, [this]() { m_nav->setCurrentRow(kAppearanceRow); });
+    menu.addSeparator();
+    menu.addAction(tr("Сбросить оформление"), this, [this]() {
+        ThemeManager::instance()->resetAppearance();
+        notify(tr("Оформление сброшено"));
+    });
+    menu.addAction(tr("О программе"), this, [this]() {
+        QMessageBox::about(this, tr("О программе"),
+                           tr("<b>FLACORE</b> — проигрыватель FLAC/MP3 и клиент yt-dlp.<br><br>"
+                              "Версия: %1<br>Тем: %2<br>Папка тем: %3")
+                               .arg(QCoreApplication::applicationVersion())
+                               .arg(ThemeManager::instance()->themes().size())
+                               .arg(QDir::toNativeSeparators(ThemeManager::userThemesDir())));
+    });
+    menu.addSeparator();
+    menu.addAction(tr("Выход"), this, [this]() { close(); });
+    menu.exec(globalPos);
+}
+
+void MainWindow::onYtDlpSettings()
+{
     YtDlpSettingsDialog dialog(this);
     if (dialog.exec() != QDialog::Accepted)
         return;
 
     QSettings settings;
-    settings.setValue("ytdlp/binary", dialog.binaryPath());
-    settings.setValue("ytdlp/ffmpegDir", dialog.ffmpegDir());
-    settings.setValue("ytdlp/libraryDir", dialog.libraryDir());
-    settings.setValue("ytdlp/audioFormat", dialog.audioFormat());
+    settings.setValue(QStringLiteral("ytdlp/binary"), dialog.binaryPath());
+    settings.setValue(QStringLiteral("ytdlp/ffmpegDir"), dialog.ffmpegDir());
+    settings.setValue(QStringLiteral("ytdlp/libraryDir"), dialog.libraryDir());
+    settings.setValue(QStringLiteral("ytdlp/audioFormat"), dialog.audioFormat());
     settings.sync();
 
-    ytdlp->setBinary(dialog.binaryPath());
-    ytdlp->checkAvailability();
-    statusBar()->showMessage(tr("Настройки yt-dlp сохранены"), 4000);
+    m_ytdlp->setBinary(dialog.binaryPath());
+    m_ytdlp->checkAvailability();
+    m_ytdlpPage->form()->setBinaryPath(dialog.binaryPath());
+    notify(tr("Настройки yt-dlp сохранены"));
+}
+
+void MainWindow::toggleMaximize()
+{
+    if (isMaximized())
+        showNormal();
+    else
+        showMaximized();
+}
+
+void MainWindow::setFrameless(bool frameless)
+{
+    applyFrameless(frameless);
+}
+
+void MainWindow::applyFrameless(bool frameless)
+{
+    m_frameless = frameless;
+    const bool visible = isVisible();
+    const QRect geometry = this->geometry();
+
+    setWindowFlag(Qt::FramelessWindowHint, frameless);
+    setAttribute(Qt::WA_TranslucentBackground, frameless);
+
+    m_titleBar->setFrameless(frameless);
+    m_backdrop->setFramelessMode(frameless);
+
+    const bool maximized = isMaximized();
+    m_inset = (frameless && !maximized) ? kTopInset : 0;
+    const int radius = frameless ? ThemeUtil::number(QStringLiteral("radius"), 16) + 4 : 0;
+    m_backdrop->setPanelInset(m_inset);
+    m_backdrop->setCornerRadius(maximized ? 0 : radius);
+
+    if (auto *layout = qobject_cast<QVBoxLayout *>(m_backdrop->layout()))
+        layout->setContentsMargins(m_inset, m_inset, m_inset, m_inset);
+
+    if (visible) {
+        show();
+        setGeometry(geometry);
+    }
+    positionToast();
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    QMainWindow::changeEvent(event);
+    if (event->type() != QEvent::WindowStateChange || !m_frameless)
+        return;
+
+    const bool maximized = isMaximized();
+    m_inset = maximized ? 0 : kTopInset;
+    const int radius = ThemeUtil::number(QStringLiteral("radius"), 16) + 4;
+    m_backdrop->setPanelInset(m_inset);
+    m_backdrop->setCornerRadius(maximized ? 0 : radius);
+    if (auto *layout = qobject_cast<QVBoxLayout *>(m_backdrop->layout()))
+        layout->setContentsMargins(m_inset, m_inset, m_inset, m_inset);
+
+    m_titleBar->setMaximized(maximized);
+    positionToast();
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    positionToast();
+}
+
+void MainWindow::positionToast()
+{
+    if (!m_toast)
+        return;
+
+    m_toast->adjustSize();
+    const int x = (width() - m_toast->width()) / 2;
+    const int y = height() - m_playerBar->height() - m_toast->height() - m_inset - 26;
+    m_toast->move(qMax(m_inset + 8, x), qMax(m_inset + 8, y));
+}
+
+void MainWindow::notify(const QString &text, bool error)
+{
+    if (text.isEmpty())
+        return;
+
+    m_toast->setProperty("role", error ? QStringLiteral("danger") : QStringLiteral("caption"));
+    m_toast->style()->unpolish(m_toast);
+    m_toast->style()->polish(m_toast);
+    m_toast->setText(text);
+    m_toast->show();
+    m_toast->raise();
+    positionToast();
+    m_toastTimer->start();
 }

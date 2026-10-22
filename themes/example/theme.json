@@ -1,0 +1,22 @@
+{
+  "id": "example",
+  "name": "Example Theme",
+  "description": {
+    "ru": "Пример своей темы: скопируйте папку и правьте под себя",
+    "en": "Example theme: copy the folder and make it yours"
+  },
+  "version": "1.0.0",
+  "author": { "name": "FLACORE" },
+  "license": "MIT",
+  "accent": "#22d3ee",
+  "background": "#0a0f14",
+  "font": "manrope",
+  "mode": "beauty",
+  "tokens": {
+    "radius": 20,
+    "radius-lg": 28,
+    "glass-alpha": 0.48,
+    "blur": 28,
+    "border": "#3322d3ee"
+  }
+}

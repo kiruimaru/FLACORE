@@ -1,0 +1,27 @@
+/* Carbon: монохром, тонкие рамки, без градиентов и свечения. */
+
+QWidget[dataUi="player"] {
+    background: #16171b;
+    border: 1px solid @border;
+}
+
+QWidget[dataUi="card"] {
+    background: #16171b;
+}
+
+QListWidget[dataUi="sidebar"]::item:selected {
+    background: #26272c;
+    color: #ffffff;
+}
+
+QPushButton {
+    background: #1b1c21;
+}
+
+QPushButton[variant="accent"] {
+    color: #101114;
+}
+
+QSlider::sub-page:horizontal {
+    background: #d4d4d8;
+}
