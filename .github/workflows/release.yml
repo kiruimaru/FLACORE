@@ -54,8 +54,9 @@ jobs:
         shell: bash
         run: |
           cmake --install build --prefix "$PWD/AppDir/usr"
-          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/scalable/apps
           cp packaging/linux/flacore.desktop AppDir/usr/share/applications/
+          cp packaging/linux/flacore.svg AppDir/usr/share/icons/hicolor/scalable/apps/
           curl -L --fail -o linuxdeploy-x86_64.AppImage \
             https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           curl -L --fail -o linuxdeploy-plugin-qt-x86_64.AppImage \
