@@ -12,6 +12,8 @@
 
 class YtDlp;
 class YouTubePanel;
+class QAction;
+class QStackedWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -37,10 +39,13 @@ private slots:
     void onPlaylistTrackAdded(int index);
     void onCurrentTrackChanged(int index);
     void onYtDlpSettings();
+    void onThemeToggle();
 
 private:
     void setupUI();
     void createMenuBar();
+    void applyTheme(bool lightTheme);
+    void updateThemeButton();
     void loadTrack(int index);
     void updateButtonStates();
     void playFile(const QString &path);
@@ -55,10 +60,14 @@ private:
     // UI Components
     QWidget *centralWidget;
     QLabel *fileLabel;
+    QLabel *filePathLabel;
     QLabel *currentTimeLabel;
     QLabel *totalTimeLabel;
+    QLabel *playlistCountLabel;
     QSlider *progressSlider;
     QSlider *volumeSlider;
+    QStackedWidget *playlistStack;
+    QStackedWidget *playPauseStack;
 
     // Buttons
     QPushButton *openButton;
@@ -69,9 +78,14 @@ private:
     QPushButton *previousButton;
     QPushButton *removeTrackButton;
     QPushButton *clearPlaylistButton;
+    QPushButton *themeButton;
 
     // Playlist UI
     QListWidget *playlistWidget;
+
+    QAction *darkThemeAction = nullptr;
+    QAction *lightThemeAction = nullptr;
+    bool m_lightTheme = false;
 };
 
 #endif // MAINWINDOW_H

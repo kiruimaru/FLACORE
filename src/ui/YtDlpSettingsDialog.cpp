@@ -29,19 +29,37 @@ YtDlpSettingsDialog::YtDlpSettingsDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Настройки yt-dlp"));
-    setMinimumWidth(560);
+    setMinimumWidth(620);
 
     auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(24, 22, 24, 20);
+    layout->setSpacing(14);
+
+    auto *heading = new QLabel(tr("Онлайн-библиотека"), this);
+    heading->setObjectName(QStringLiteral("trackTitle"));
+    layout->addWidget(heading);
+
+    auto *description = new QLabel(
+        tr("Настройте загрузчики, папку сохранения и формат аудио."), this);
+    description->setObjectName(QStringLiteral("trackPath"));
+    description->setWordWrap(true);
+    layout->addWidget(description);
 
     auto *form = new QFormLayout();
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    form->setHorizontalSpacing(14);
+    form->setVerticalSpacing(12);
+    form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     // yt-dlp
     auto *binaryRow = new QHBoxLayout();
     m_binaryEdit = new QLineEdit(settingsString("ytdlp/binary", YtDlp::resolveBinary()), this);
+    m_binaryEdit->setObjectName(QStringLiteral("ytDlpBinaryPath"));
     m_binaryEdit->setPlaceholderText(tr("пусто = искать yt-dlp в PATH"));
     auto *binaryBrowse = new QPushButton(tr("Обзор…"), this);
     auto *binaryDetect = new QPushButton(tr("Найти"), this);
+    binaryBrowse->setObjectName(QStringLiteral("binaryBrowseButton"));
+    binaryDetect->setObjectName(QStringLiteral("binaryDetectButton"));
     binaryRow->addWidget(m_binaryEdit, 1);
     binaryRow->addWidget(binaryBrowse);
     binaryRow->addWidget(binaryDetect);
@@ -50,8 +68,10 @@ YtDlpSettingsDialog::YtDlpSettingsDialog(QWidget *parent)
     // ffmpeg
     auto *ffmpegRow = new QHBoxLayout();
     m_ffmpegEdit = new QLineEdit(settingsString("ytdlp/ffmpegDir", YtDlp::resolveFfmpegDir()), this);
+    m_ffmpegEdit->setObjectName(QStringLiteral("ffmpegDirectory"));
     m_ffmpegEdit->setPlaceholderText(tr("папка с ffmpeg — нужна для сохранения в FLAC/MP3"));
     auto *ffmpegBrowse = new QPushButton(tr("Обзор…"), this);
+    ffmpegBrowse->setObjectName(QStringLiteral("ffmpegBrowseButton"));
     ffmpegRow->addWidget(m_ffmpegEdit, 1);
     ffmpegRow->addWidget(ffmpegBrowse);
     form->addRow(tr("ffmpeg:"), ffmpegRow);
@@ -59,13 +79,16 @@ YtDlpSettingsDialog::YtDlpSettingsDialog(QWidget *parent)
     // Библиотека
     auto *libraryRow = new QHBoxLayout();
     m_libraryEdit = new QLineEdit(settingsString("ytdlp/libraryDir", YtDlp::libraryDir()), this);
+    m_libraryEdit->setObjectName(QStringLiteral("libraryDirectory"));
     auto *libraryBrowse = new QPushButton(tr("Обзор…"), this);
+    libraryBrowse->setObjectName(QStringLiteral("libraryBrowseButton"));
     libraryRow->addWidget(m_libraryEdit, 1);
     libraryRow->addWidget(libraryBrowse);
     form->addRow(tr("Библиотека:"), libraryRow);
 
     // Формат
     m_formatCombo = new QComboBox(this);
+    m_formatCombo->setObjectName(QStringLiteral("audioFormat"));
     m_formatCombo->addItem(QStringLiteral("FLAC (без потерь)"), QStringLiteral("flac"));
     m_formatCombo->addItem(QStringLiteral("MP3 320 kbps"), QStringLiteral("mp3"));
     m_formatCombo->addItem(QStringLiteral("Opus"), QStringLiteral("opus"));
@@ -78,11 +101,13 @@ YtDlpSettingsDialog::YtDlpSettingsDialog(QWidget *parent)
     layout->addLayout(form);
 
     m_hint = new QLabel(this);
+    m_hint->setObjectName(QStringLiteral("settingsHint"));
     m_hint->setWordWrap(true);
     m_hint->setStyleSheet(QStringLiteral("color: palette(mid);"));
     layout->addWidget(m_hint);
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    buttons->setObjectName(QStringLiteral("settingsButtons"));
     layout->addWidget(buttons);
 
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);

@@ -2,7 +2,6 @@
 
 #include "core/ytdlp/YtDlp.h"
 
-#include <QColor>
 #include <QComboBox>
 #include <QDir>
 #include <QFileInfo>
@@ -13,6 +12,9 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
+#include <QStyle>
+#include <QSize>
+#include <QSizePolicy>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -119,10 +121,15 @@ YouTubePanel::YouTubePanel(YtDlp *ytdlp, QWidget *parent)
 void YouTubePanel::setupUi()
 {
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
-    layout->setSpacing(6);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+
+    auto *heading = new QLabel(tr("НАЙТИ МУЗЫКУ"), this);
+    heading->setObjectName(QStringLiteral("eyebrowLabel"));
+    layout->addWidget(heading);
 
     auto *searchRow = new QHBoxLayout();
+    searchRow->setSpacing(7);
     m_sourceCombo = new QComboBox(this);
     m_sourceCombo->setObjectName(QStringLiteral("ytSourceCombo"));
     m_sourceCombo->addItem(tr("YouTube"), int(YtDlp::Provider::YouTube));
@@ -131,6 +138,8 @@ void YouTubePanel::setupUi()
     m_searchEdit->setObjectName(QStringLiteral("ytSearchEdit"));
     m_searchEdit->setPlaceholderText(tr("Поиск или ссылка (YouTube, SoundCloud, …)"));
     m_searchEdit->setClearButtonEnabled(true);
+    m_searchEdit->setMinimumWidth(100);
+    m_searchEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_searchButton = new QPushButton(tr("Найти"), this);
     m_searchButton->setObjectName(QStringLiteral("ytSearchButton"));
     m_searchButton->setDefault(true);
@@ -142,11 +151,14 @@ void YouTubePanel::setupUi()
     m_results = new QListWidget(this);
     m_results->setObjectName(QStringLiteral("ytResults"));
     m_results->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_results->setAlternatingRowColors(true);
+    m_results->setAlternatingRowColors(false);
     m_results->setWordWrap(true);
+    m_results->setSpacing(2);
+    m_results->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     layout->addWidget(m_results, 1);
 
     auto *actionsRow = new QHBoxLayout();
+    actionsRow->setSpacing(7);
     m_playButton = new QPushButton(tr("Слушать"), this);
     m_playButton->setObjectName(QStringLiteral("ytPlayButton"));
     m_playButton->setToolTip(tr("Скачать во временный кэш и сразу включить"));
@@ -166,13 +178,13 @@ void YouTubePanel::setupUi()
     m_progress->setObjectName(QStringLiteral("ytProgress"));
     m_progress->setRange(0, 100);
     m_progress->setValue(0);
-    m_progress->setTextVisible(true);
+    m_progress->setTextVisible(false);
     layout->addWidget(m_progress);
 
     m_status = new QLabel(this);
     m_status->setObjectName(QStringLiteral("ytStatus"));
     m_status->setWordWrap(true);
-    m_status->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    m_status->setProperty("error", false);
     layout->addWidget(m_status);
 
     connect(m_searchButton, &QPushButton::clicked, this, &YouTubePanel::runSearch);
@@ -255,13 +267,17 @@ void YouTubePanel::updateUi()
 void YouTubePanel::setStatus(const QString &text)
 {
     m_status->setText(text);
-    m_status->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    m_status->setProperty("error", false);
+    m_status->style()->unpolish(m_status);
+    m_status->style()->polish(m_status);
 }
 
 void YouTubePanel::setError(const QString &text)
 {
     m_status->setText(text);
-    m_status->setStyleSheet(QStringLiteral("color: #ff6b6b;"));
+    m_status->setProperty("error", true);
+    m_status->style()->unpolish(m_status);
+    m_status->style()->polish(m_status);
 }
 
 bool YouTubePanel::selectedTarget(QString *url, QString *title) const
@@ -288,7 +304,9 @@ void YouTubePanel::addResultItem(const YtDlpResult &result)
     item->setData(kUrlRole, result.webpageUrl);
     item->setData(kTitleRole, result.title);
     item->setToolTip(result.webpageUrl);
+    item->setSizeHint(QSize(0, 48));
 
     if (!result.durationSec)
-        item->setForeground(QColor(0xa0, 0xa0, 0xa0)); // live/неизвестная длительность
+        item->setToolTip(tr("Прямой эфир или неизвестная длительность\n%1")
+                             .arg(result.webpageUrl));
 }
