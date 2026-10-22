@@ -43,7 +43,6 @@ AuroraBackdrop::AuroraBackdrop(QWidget *parent)
     : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent, false);
-    setAttribute(Qt::WA_TransparentForMouseEvents, true);
     setFocusPolicy(Qt::NoFocus);
 
     m_timer.setInterval(40);
@@ -72,7 +71,6 @@ void AuroraBackdrop::setPanelInset(int inset)
 void AuroraBackdrop::setFramelessMode(bool frameless)
 {
     m_frameless = frameless;
-    setAttribute(Qt::WA_TransparentForMouseEvents, !frameless);
     setMouseTracking(frameless);
     setCursor(Qt::ArrowCursor);
     update();

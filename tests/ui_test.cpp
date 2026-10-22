@@ -162,6 +162,8 @@ int main(int argc, char **argv)
     check(youtube != nullptr, QStringLiteral("панель загрузки найдена"));
     if (!nav || !pages || !library || !playerBar || !backdrop || !playlist || !youtube)
         return 2;
+    check(!backdrop->testAttribute(Qt::WA_TransparentForMouseEvents),
+          QStringLiteral("подложка не отключает мышь у дочерних элементов"));
 
     check(nav->currentRow() == 0 && pages->currentIndex() == 0,
           QStringLiteral("на старте открыт раздел «Обзор»"));
@@ -514,6 +516,9 @@ int main(int argc, char **argv)
               QStringLiteral("с выключенной «своей шапкой» окно использует системную рамку"));
         check(normal.findChild<PlayerBar *>(QStringLiteral("playerBar")) != nullptr,
               QStringLiteral("каркас собирается и в обычном режиме"));
+        auto *normalBackdrop = normal.findChild<AuroraBackdrop *>();
+        check(normalBackdrop && !normalBackdrop->testAttribute(Qt::WA_TransparentForMouseEvents),
+              QStringLiteral("в обычном режиме элементы окна остаются кликабельными"));
     }
 
     std::printf("\n%s\n", g_failures == 0 ? "ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ" : "ЕСТЬ ПРОВАЛЫ");
