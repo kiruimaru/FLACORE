@@ -8,17 +8,23 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QDesktopServices>
+#include <QColorDialog>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QPalette>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QSettings>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -29,6 +35,28 @@
 #include <QUrl>
 
 namespace {
+
+const QList<QPair<QString, QString>> &themeColorRoles()
+{
+    static const QList<QPair<QString, QString>> roles = {
+        {QStringLiteral("background"), QObject::tr("Фон окна")},
+        {QStringLiteral("panel"), QObject::tr("Панели")},
+        {QStringLiteral("input"), QObject::tr("Поля ввода")},
+        {QStringLiteral("text"), QObject::tr("Основной текст")},
+        {QStringLiteral("muted"), QObject::tr("Вторичный текст")},
+        {QStringLiteral("border"), QObject::tr("Границы")},
+        {QStringLiteral("borderStrong"), QObject::tr("Активные границы")},
+        {QStringLiteral("accent"), QObject::tr("Акцент")},
+        {QStringLiteral("selection"), QObject::tr("Выделение")},
+        {QStringLiteral("cover"), QObject::tr("Обложка")}
+    };
+    return roles;
+}
+
+QString customColor(const QString &role, const QString &fallback)
+{
+    return QSettings().value(QStringLiteral("ui/customColors/") + role, fallback).toString();
+}
 
 QIcon interfaceIcon(const QString &name, QStyle::StandardPixmap fallback, QWidget *widget)
 {
@@ -49,30 +77,62 @@ QString trackCountSuffix(int count)
     return QObject::tr("треков");
 }
 
-QString applicationStyle(bool lightTheme)
+QString applicationStyle(const QString &theme)
 {
-    const QString background = lightTheme ? QStringLiteral("#f5f6f8")
-                                          : QStringLiteral("#0d0f12");
-    const QString panel = lightTheme ? QStringLiteral("#ffffff")
-                                     : QStringLiteral("#15181d");
-    const QString input = lightTheme ? QStringLiteral("#f0f2f5")
-                                     : QStringLiteral("#1c2026");
-    const QString border = lightTheme ? QStringLiteral("#dfe3e8")
-                                      : QStringLiteral("#292e36");
-    const QString borderStrong = lightTheme ? QStringLiteral("#cbd1d9")
-                                            : QStringLiteral("#353c47");
-    const QString text = lightTheme ? QStringLiteral("#171a1f")
-                                    : QStringLiteral("#f2f4f7");
-    const QString muted = lightTheme ? QStringLiteral("#69717d")
-                                     : QStringLiteral("#929aa7");
-    const QString accent = QStringLiteral("#52d69a");
-    const QString accentHover = QStringLiteral("#6be5ad");
-    const QString accentText = QStringLiteral("#08110d");
-    const QString selection = lightTheme ? QStringLiteral("#d9f6e8")
-                                         : QStringLiteral("#1c4438");
-    const QString cover = lightTheme ? QStringLiteral("#e9edf1")
-                                     : QStringLiteral("#20262d");
+    const bool lightTheme = theme == QLatin1String("light")
+                            || theme == QLatin1String("apple")
+                            || theme == QLatin1String("sunset");
+    QString accent = QSettings().value(
+        QStringLiteral("ui/customAccent"), QStringLiteral("#52d69a")).toString();
+    QString background = lightTheme ? QStringLiteral("#f5f6f8") : QStringLiteral("#0d0f12");
+    QString panel = lightTheme ? QStringLiteral("#ffffff") : QStringLiteral("#15181d");
+    QString input = lightTheme ? QStringLiteral("#f0f2f5") : QStringLiteral("#1c2026");
+    QString border = lightTheme ? QStringLiteral("#dfe3e8") : QStringLiteral("#292e36");
+    QString borderStrong = lightTheme ? QStringLiteral("#cbd1d9") : QStringLiteral("#353c47");
+    QString text = lightTheme ? QStringLiteral("#171a1f") : QStringLiteral("#f2f4f7");
+    QString muted = lightTheme ? QStringLiteral("#69717d") : QStringLiteral("#929aa7");
+    QString accentHover = accent;
+    QString accentText = QStringLiteral("#08110d");
+    if (theme == QLatin1String("soundcloud")) {
+        accentHover = QStringLiteral("#ff8b42");
+    } else if (theme == QLatin1String("apple")) {
+        accentHover = QStringLiteral("#f04455");
+        accentText = QStringLiteral("#ffffff");
+    } else if (theme == QLatin1String("ocean")) {
+        accentHover = QStringLiteral("#57c9e8");
+        accentText = QStringLiteral("#071319");
+    } else if (theme == QLatin1String("sunset")) {
+        accentHover = QStringLiteral("#a04e36");
+        accentText = QStringLiteral("#ffffff");
+    } else if (theme != QLatin1String("custom")) {
+        accentHover = QStringLiteral("#6be5ad");
+    }
+    if (theme == QLatin1String("soundcloud"))
+        accent = QStringLiteral("#ff6b00");
+    else if (theme == QLatin1String("apple"))
+        accent = QStringLiteral("#e8334a");
+    else if (theme == QLatin1String("ocean"))
+        accent = QStringLiteral("#19a7ce");
+    else if (theme == QLatin1String("sunset"))
+        accent = QStringLiteral("#e57945");
+    QString selection = lightTheme ? QStringLiteral("#d9f6e8") : QStringLiteral("#1c4438");
+    QString cover = lightTheme ? QStringLiteral("#e9edf1") : QStringLiteral("#20262d");
     const QString danger = QStringLiteral("#f06b78");
+    if (theme == QLatin1String("custom")) {
+        background = customColor(QStringLiteral("background"), background);
+        panel = customColor(QStringLiteral("panel"), panel);
+        input = customColor(QStringLiteral("input"), input);
+        text = customColor(QStringLiteral("text"), text);
+        muted = customColor(QStringLiteral("muted"), muted);
+        border = customColor(QStringLiteral("border"), border);
+        borderStrong = customColor(QStringLiteral("borderStrong"), borderStrong);
+        accent = customColor(QStringLiteral("accent"), accent);
+        selection = customColor(QStringLiteral("selection"), selection);
+        cover = customColor(QStringLiteral("cover"), cover);
+        accentHover = QColor(accent).lighter(115).name();
+        accentText = QColor(accent).lightness() > 150 ? QStringLiteral("#111111")
+                                                       : QStringLiteral("#ffffff");
+    }
 
     return QStringLiteral(R"(
 QMainWindow {
@@ -80,7 +140,7 @@ QMainWindow {
 }
 
 QWidget#appRoot {
-    background: %1;
+    background: %19;
 }
 
 QWidget#topBar {
@@ -424,11 +484,16 @@ QLabel#ytStatus[error="true"] {
         borderStrong, lightTheme ? QStringLiteral("#e2e6eb") : QStringLiteral("#171a1f"),
         lightTheme ? QStringLiteral("#a4aab3") : QStringLiteral("#555d68"),
         lightTheme ? QStringLiteral("#e7e9ed") : QStringLiteral("#242a31"),
-        border, accentText, accentHover, danger);
+        border, accentText, accentHover, danger,
+        QSettings().value(QStringLiteral("ui/backgroundImage")).toString().isEmpty()
+            ? background : QStringLiteral("transparent"));
 }
 
-QPalette applicationPalette(bool lightTheme)
+QPalette applicationPalette(const QString &theme)
 {
+    const bool lightTheme = theme == QLatin1String("light")
+                            || theme == QLatin1String("apple")
+                            || theme == QLatin1String("sunset");
     const QColor window = lightTheme ? QColor(QStringLiteral("#f5f6f8"))
                                      : QColor(QStringLiteral("#0d0f12"));
     const QColor panel = lightTheme ? QColor(QStringLiteral("#ffffff"))
@@ -439,24 +504,47 @@ QPalette applicationPalette(bool lightTheme)
                                    : QColor(QStringLiteral("#f2f4f7"));
     const QColor muted = lightTheme ? QColor(QStringLiteral("#69717d"))
                                     : QColor(QStringLiteral("#929aa7"));
-    const QColor accent = QColor(QStringLiteral("#52d69a"));
-    const QColor selection = lightTheme ? QColor(QStringLiteral("#d9f6e8"))
-                                        : QColor(QStringLiteral("#1c4438"));
+    QColor accent(QSettings().value(
+        QStringLiteral("ui/customAccent"), QStringLiteral("#52d69a")).toString());
+    if (theme == QLatin1String("soundcloud"))
+        accent = QColor(QStringLiteral("#ff6b00"));
+    else if (theme == QLatin1String("apple"))
+        accent = QColor(QStringLiteral("#e8334a"));
+    else if (theme == QLatin1String("ocean"))
+        accent = QColor(QStringLiteral("#19a7ce"));
+    else if (theme == QLatin1String("sunset"))
+        accent = QColor(QStringLiteral("#e57945"));
+    QColor selection = lightTheme ? QColor(QStringLiteral("#d9f6e8"))
+                                  : QColor(QStringLiteral("#1c4438"));
+    QColor actualWindow = window;
+    QColor actualInput = input;
+    QColor actualPanel = panel;
+    QColor actualText = text;
+    QColor actualMuted = muted;
+    if (theme == QLatin1String("custom")) {
+        actualWindow = QColor(customColor(QStringLiteral("background"), window.name()));
+        actualPanel = QColor(customColor(QStringLiteral("panel"), panel.name()));
+        actualInput = QColor(customColor(QStringLiteral("input"), input.name()));
+        actualText = QColor(customColor(QStringLiteral("text"), text.name()));
+        actualMuted = QColor(customColor(QStringLiteral("muted"), muted.name()));
+        accent = QColor(customColor(QStringLiteral("accent"), accent.name()));
+        selection = QColor(customColor(QStringLiteral("selection"), selection.name()));
+    }
 
     QPalette palette;
-    palette.setColor(QPalette::Window, window);
-    palette.setColor(QPalette::Base, input);
-    palette.setColor(QPalette::AlternateBase, panel);
-    palette.setColor(QPalette::Button, input);
-    palette.setColor(QPalette::Text, text);
-    palette.setColor(QPalette::WindowText, text);
-    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::Window, actualWindow);
+    palette.setColor(QPalette::Base, actualInput);
+    palette.setColor(QPalette::AlternateBase, actualPanel);
+    palette.setColor(QPalette::Button, actualInput);
+    palette.setColor(QPalette::Text, actualText);
+    palette.setColor(QPalette::WindowText, actualText);
+    palette.setColor(QPalette::ButtonText, actualText);
     palette.setColor(QPalette::Highlight, accent);
     palette.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#08110d")));
-    palette.setColor(QPalette::PlaceholderText, muted);
-    palette.setColor(QPalette::ToolTipBase, panel);
-    palette.setColor(QPalette::ToolTipText, text);
-    palette.setColor(QPalette::Mid, muted);
+    palette.setColor(QPalette::PlaceholderText, actualMuted);
+    palette.setColor(QPalette::ToolTipBase, actualPanel);
+    palette.setColor(QPalette::ToolTipText, actualText);
+    palette.setColor(QPalette::Mid, actualMuted);
     palette.setColor(QPalette::Disabled, QPalette::Text,
                      lightTheme ? QColor(QStringLiteral("#a4aab3"))
                                 : QColor(QStringLiteral("#555d68")));
@@ -482,13 +570,12 @@ MainWindow::MainWindow(QWidget *parent)
     playlist = new Playlist(this);
     ytdlp = new YtDlp(this);
 
-    m_lightTheme = QSettings().value(QStringLiteral("ui/theme"),
-                                     QStringLiteral("dark")).toString()
-                   == QLatin1String("light");
+    m_theme = QSettings().value(QStringLiteral("ui/theme"),
+                                QStringLiteral("dark")).toString();
 
     setupUI();
     createMenuBar();
-    applyTheme(m_lightTheme);
+    applyTheme(m_theme);
 
     connect(player, &QMediaPlayer::positionChanged,
             this, &MainWindow::onPositionChanged);
@@ -531,6 +618,28 @@ MainWindow::MainWindow(QWidget *parent)
                     tr("Добавлено в плейлист: %1").arg(QFileInfo(path).fileName()),
                     5000);
             });
+    connect(youtubePanel, &YouTubePanel::filesAdded, this,
+            [this](const QStringList &paths) {
+                QStringList added;
+                for (const QString &path : paths) {
+                    if (!QFileInfo::exists(path))
+                        continue;
+                    bool exists = false;
+                    for (int i = 0; i < playlist->count(); ++i) {
+                        if (playlist->getTrackPath(i) == path) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists)
+                        added.append(path);
+                }
+                playlist->addTracks(added);
+                updateButtonStates();
+                statusBar()->showMessage(
+                    tr("Добавлено в библиотеку и плейлист: %1 файлов").arg(added.size()),
+                    6000);
+            });
 
     connect(ytdlp, &YtDlp::availabilityChecked, this,
             [this](bool available, const QString &info) {
@@ -549,6 +658,7 @@ void MainWindow::setupUI()
 {
     centralWidget = new QWidget(this);
     centralWidget->setObjectName(QStringLiteral("appRoot"));
+    centralWidget->setAutoFillBackground(true);
     setCentralWidget(centralWidget);
 
     setObjectName(QStringLiteral("mainWindow"));
@@ -578,6 +688,15 @@ void MainWindow::setupUI()
     auto *statusPill = new QLabel(tr("АУДИО"), topBar);
     statusPill->setObjectName(QStringLiteral("statusPill"));
     topLayout->addWidget(statusPill);
+
+    auto *feedbackButton = new QPushButton(tr("Feedback"), topBar);
+    feedbackButton->setObjectName(QStringLiteral("feedbackButton"));
+    feedbackButton->setToolTip(tr("Открыть GitHub Issues"));
+    connect(feedbackButton, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral(
+            "https://github.com/kiruimaru/FLACORE/issues")));
+    });
+    topLayout->addWidget(feedbackButton);
 
     themeButton = new QPushButton(topBar);
     themeButton->setObjectName(QStringLiteral("themeButton"));
@@ -898,29 +1017,234 @@ void MainWindow::createMenuBar()
     darkThemeAction = themeMenu->addAction(tr("Тёмная"));
     darkThemeAction->setCheckable(true);
     darkThemeAction->setActionGroup(themeGroup);
+    darkThemeAction->setData(QStringLiteral("dark"));
+    m_themeActions.append(darkThemeAction);
     lightThemeAction = themeMenu->addAction(tr("Светлая"));
     lightThemeAction->setCheckable(true);
     lightThemeAction->setActionGroup(themeGroup);
+    lightThemeAction->setData(QStringLiteral("light"));
+    m_themeActions.append(lightThemeAction);
+    const QList<QPair<QString, QString>> presets = {
+        {QStringLiteral("soundcloud"), tr("SoundCloud")},
+        {QStringLiteral("apple"), tr("Apple Music")},
+        {QStringLiteral("ocean"), tr("Океан")},
+        {QStringLiteral("sunset"), tr("Закат")}
+    };
+    for (const auto &preset : presets) {
+        QAction *action = themeMenu->addAction(preset.second);
+        action->setCheckable(true);
+        action->setActionGroup(themeGroup);
+        action->setData(preset.first);
+        m_themeActions.append(action);
+        connect(action, &QAction::triggered, this,
+                [this, id = preset.first]() { applyTheme(id); });
+    }
+    themeMenu->addSeparator();
+    QAction *customAccent = themeMenu->addAction(tr("Настроить акцентный цвет..."));
+    connect(customAccent, &QAction::triggered, this, [this]() {
+        const QColor current(QSettings().value(
+            QStringLiteral("ui/customAccent"), QStringLiteral("#52d69a")).toString());
+        const QColor color = QColorDialog::getColor(current, this, tr("Акцентный цвет"));
+        if (!color.isValid())
+            return;
+        QSettings().setValue(QStringLiteral("ui/customAccent"), color.name());
+        applyTheme(QStringLiteral("custom"));
+    });
+    QAction *hardcore = themeMenu->addAction(tr("Хардкор: настроить все цвета..."));
+    connect(hardcore, &QAction::triggered, this, &MainWindow::editThemeHardcore);
+    QAction *interactive = themeMenu->addAction(tr("Интерактивная настройка..."));
+    connect(interactive, &QAction::triggered, this, &MainWindow::editThemeInteractive);
+    themeMenu->addSeparator();
+    QAction *exportConfig = themeMenu->addAction(tr("Экспорт цветового конфига..."));
+    connect(exportConfig, &QAction::triggered, this, &MainWindow::exportThemeConfig);
+    QAction *importConfig = themeMenu->addAction(tr("Импорт цветового конфига..."));
+    connect(importConfig, &QAction::triggered, this, &MainWindow::importThemeConfig);
+    QAction *setBackground = themeMenu->addAction(tr("Установить фото фоном..."));
+    connect(setBackground, &QAction::triggered, this, &MainWindow::chooseBackground);
+    QAction *clearBackground = themeMenu->addAction(tr("Убрать фото фона"));
+    connect(clearBackground, &QAction::triggered, this, [this]() {
+        QSettings().remove(QStringLiteral("ui/backgroundImage"));
+        m_backgroundImage = QPixmap();
+        applyTheme(m_theme);
+    });
 
     connect(darkThemeAction, &QAction::triggered,
-            this, [this]() { applyTheme(false); });
+            this, [this]() { applyTheme(QStringLiteral("dark")); });
     connect(lightThemeAction, &QAction::triggered,
-            this, [this]() { applyTheme(true); });
+            this, [this]() { applyTheme(QStringLiteral("light")); });
 }
 
-void MainWindow::applyTheme(bool lightTheme)
+void MainWindow::applyTheme(const QString &theme)
 {
-    m_lightTheme = lightTheme;
-    QApplication::setPalette(applicationPalette(lightTheme));
-    qApp->setStyleSheet(applicationStyle(lightTheme));
+    m_theme = theme;
+    QApplication::setPalette(applicationPalette(theme));
+    qApp->setStyleSheet(applicationStyle(theme));
 
     QSettings settings;
-    settings.setValue(QStringLiteral("ui/theme"),
-                      lightTheme ? QStringLiteral("light")
-                                 : QStringLiteral("dark"));
+    settings.setValue(QStringLiteral("ui/theme"), theme);
     settings.sync();
 
+    const QString imagePath = settings.value(QStringLiteral("ui/backgroundImage")).toString();
+    m_backgroundImage = imagePath.isEmpty() ? QPixmap() : QPixmap(imagePath);
+    applyBackground();
     updateThemeButton();
+}
+
+void MainWindow::applyBackground()
+{
+    if (centralWidget == nullptr)
+        return;
+    QPalette palette = centralWidget->palette();
+    if (m_backgroundImage.isNull()) {
+        palette.setBrush(QPalette::Window, QApplication::palette().brush(QPalette::Window));
+    } else {
+        const QSize target = centralWidget->size();
+        const QPixmap scaled = m_backgroundImage.scaled(
+            target, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+        const QRect crop((scaled.width() - target.width()) / 2,
+                         (scaled.height() - target.height()) / 2,
+                         target.width(), target.height());
+        palette.setBrush(QPalette::Window, QBrush(scaled.copy(crop)));
+    }
+    centralWidget->setPalette(palette);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    applyBackground();
+}
+
+void MainWindow::editThemeHardcore()
+{
+    QSettings settings;
+    const QMap<QString, QString> defaults = {
+        {QStringLiteral("background"), QStringLiteral("#0d0f12")},
+        {QStringLiteral("panel"), QStringLiteral("#15181d")},
+        {QStringLiteral("input"), QStringLiteral("#1c2026")},
+        {QStringLiteral("text"), QStringLiteral("#f2f4f7")},
+        {QStringLiteral("muted"), QStringLiteral("#929aa7")},
+        {QStringLiteral("border"), QStringLiteral("#292e36")},
+        {QStringLiteral("borderStrong"), QStringLiteral("#353c47")},
+        {QStringLiteral("accent"), QStringLiteral("#52d69a")},
+        {QStringLiteral("selection"), QStringLiteral("#1c4438")},
+        {QStringLiteral("cover"), QStringLiteral("#20262d")}
+    };
+    for (const auto &role : themeColorRoles()) {
+        const QString key = QStringLiteral("ui/customColors/") + role.first;
+        const QColor current(settings.value(key, defaults.value(role.first)).toString());
+        const QColor color = QColorDialog::getColor(current, this, role.second);
+        if (!color.isValid())
+            return;
+        settings.setValue(key, color.name());
+    }
+    applyTheme(QStringLiteral("custom"));
+}
+
+void MainWindow::editThemeInteractive()
+{
+    QSettings settings;
+    for (const auto &role : themeColorRoles()) {
+        QString description;
+        if (role.first == QLatin1String("background"))
+            description = tr("Основной цвет свободного пространства окна.");
+        else if (role.first == QLatin1String("panel"))
+            description = tr("Заливка панели плеера и панели библиотеки.");
+        else if (role.first == QLatin1String("input"))
+            description = tr("Поля поиска, ввода и обычные кнопки.");
+        else if (role.first == QLatin1String("text"))
+            description = tr("Заголовки, основной текст и подписи.");
+        else if (role.first == QLatin1String("muted"))
+            description = tr("Подсказки, вторичные подписи и неактивный текст.");
+        else if (role.first == QLatin1String("border"))
+            description = tr("Тонкие границы панелей и элементов.");
+        else if (role.first == QLatin1String("borderStrong"))
+            description = tr("Границы при наведении и выделении.");
+        else if (role.first == QLatin1String("accent"))
+            description = tr("Активные кнопки, ползунки и индикаторы.");
+        else if (role.first == QLatin1String("selection"))
+            description = tr("Фон выбранного трека и раскрытых меню.");
+        else
+            description = tr("Фон обложки в панели плеера.");
+        QMessageBox prompt(QMessageBox::Question, tr("Интерактивная тема"),
+                           tr("Цветовая роль: %1").arg(role.second),
+                           QMessageBox::Ok | QMessageBox::Cancel, this);
+        prompt.setInformativeText(description + QLatin1Char('\n')
+                                  + tr("Выберите цвет, чтобы сразу увидеть его в интерфейсе."));
+        if (prompt.exec() != QMessageBox::Ok)
+            return;
+        const QString key = QStringLiteral("ui/customColors/") + role.first;
+        const QColor current(settings.value(key, QStringLiteral("#20262d")).toString());
+        const QColor color = QColorDialog::getColor(current, this, role.second);
+        if (!color.isValid())
+            return;
+        settings.setValue(key, color.name());
+        applyTheme(QStringLiteral("custom"));
+    }
+}
+
+void MainWindow::exportThemeConfig()
+{
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Экспорт темы"), QStringLiteral("flacore-theme.json"),
+        tr("Цветовой конфиг (*.json)"));
+    if (path.isEmpty())
+        return;
+    QJsonObject colors;
+    for (const auto &role : themeColorRoles())
+        colors.insert(role.first, customColor(role.first, QStringLiteral("#20262d")));
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        file.write(QJsonDocument(QJsonObject{{QStringLiteral("colors"), colors}})
+                       .toJson(QJsonDocument::Indented));
+        statusBar()->showMessage(tr("Цветовой конфиг экспортирован"), 4000);
+    }
+}
+
+void MainWindow::importThemeConfig()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Импорт темы"), QString(), tr("Цветовой конфиг (*.json)"));
+    if (path.isEmpty())
+        return;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        return;
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+    if (error.error != QJsonParseError::NoError || !document.isObject()
+        || !document.object().value(QStringLiteral("colors")).isObject()) {
+        QMessageBox::warning(this, tr("Ошибка конфига"), tr("Файл цветовой темы повреждён."));
+        return;
+    }
+    const QJsonObject colors = document.object().value(QStringLiteral("colors")).toObject();
+    QSettings settings;
+    for (const auto &role : themeColorRoles()) {
+        const QJsonValue value = colors.value(role.first);
+        if (!value.isString())
+            continue;
+        const QColor color(value.toString());
+        if (color.isValid())
+            settings.setValue(QStringLiteral("ui/customColors/") + role.first, color.name());
+    }
+    applyTheme(QStringLiteral("custom"));
+}
+
+void MainWindow::chooseBackground()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Фото фона"), QString(),
+        tr("Изображения (*.png *.jpg *.jpeg *.bmp *.webp)"));
+    if (path.isEmpty())
+        return;
+    QPixmap image(path);
+    if (image.isNull()) {
+        QMessageBox::warning(this, tr("Ошибка изображения"), tr("Не удалось открыть изображение."));
+        return;
+    }
+    QSettings().setValue(QStringLiteral("ui/backgroundImage"), path);
+    m_backgroundImage = image;
+    applyBackground();
 }
 
 void MainWindow::updateThemeButton()
@@ -929,29 +1253,37 @@ void MainWindow::updateThemeButton()
         return;
 
     const QIcon icon = QIcon::fromTheme(
-        m_lightTheme ? QStringLiteral("weather-clear-night")
-                     : QStringLiteral("weather-clear"));
+        (m_theme == QLatin1String("light") || m_theme == QLatin1String("apple")
+         || m_theme == QLatin1String("sunset"))
+            ? QStringLiteral("weather-clear-night")
+            : QStringLiteral("weather-clear"));
     themeButton->setIcon(icon);
     themeButton->setText(icon.isNull()
-                             ? (m_lightTheme ? QStringLiteral("☾")
-                                             : QStringLiteral("☼"))
+                             ? ((m_theme == QLatin1String("light")
+                                 || m_theme == QLatin1String("apple")
+                                 || m_theme == QLatin1String("sunset"))
+                                    ? QStringLiteral("☾") : QStringLiteral("☼"))
                              : QString());
-    themeButton->setAccessibleName(m_lightTheme
+    const bool lightTheme = m_theme == QLatin1String("light")
+                            || m_theme == QLatin1String("apple")
+                            || m_theme == QLatin1String("sunset");
+    themeButton->setAccessibleName(lightTheme
                                        ? tr("Переключить на тёмную тему")
                                        : tr("Переключить на светлую тему"));
-    themeButton->setToolTip(m_lightTheme
+    themeButton->setToolTip(lightTheme
                                 ? tr("Переключить на тёмную тему")
                                 : tr("Переключить на светлую тему"));
 
-    if (darkThemeAction != nullptr)
-        darkThemeAction->setChecked(!m_lightTheme);
-    if (lightThemeAction != nullptr)
-        lightThemeAction->setChecked(m_lightTheme);
+    for (QAction *action : m_themeActions)
+        action->setChecked(action->data().toString() == m_theme);
 }
 
 void MainWindow::onThemeToggle()
 {
-    applyTheme(!m_lightTheme);
+    const bool lightTheme = m_theme == QLatin1String("light")
+                            || m_theme == QLatin1String("apple")
+                            || m_theme == QLatin1String("sunset");
+    applyTheme(lightTheme ? QStringLiteral("dark") : QStringLiteral("light"));
 }
 
 void MainWindow::onOpenFiles()

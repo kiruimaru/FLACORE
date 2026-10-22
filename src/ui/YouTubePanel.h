@@ -6,6 +6,7 @@
 #include "core/ytdlp/YtDlpTypes.h"
 
 class QComboBox;
+class QCheckBox;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -34,6 +35,7 @@ signals:
     void playRequested(const QString &filePath);
     /** Скачано в библиотеку: добавить в плейлист. */
     void fileAdded(const QString &filePath);
+    void filesAdded(const QStringList &filePaths);
 
 private:
     enum class Job {
@@ -61,6 +63,7 @@ private:
     QPushButton *m_playButton = nullptr;
     QPushButton *m_saveButton = nullptr;
     QPushButton *m_cancelButton = nullptr;
+    QCheckBox *m_playlistCheck = nullptr;
     QProgressBar *m_progress = nullptr;
     QLabel *m_status = nullptr;
 

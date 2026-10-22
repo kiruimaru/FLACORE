@@ -125,6 +125,11 @@ int main(int argc, char **argv)
     }
 
     std::printf("FLACORE_FILE %s\n", finalPath.c_str());
+    if (hasArg(argc, argv, "--yes-playlist")) {
+        const std::string secondPath = dir + "/Fake Track Two [fakeid2].m4a";
+        std::ofstream(secondPath, std::ios::binary) << "fake audio payload";
+        std::printf("FLACORE_FILE %s\n", secondPath.c_str());
+    }
     std::fflush(stdout);
     return 0;
 }

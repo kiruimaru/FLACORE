@@ -182,6 +182,25 @@ int main(int argc, char **argv)
         YtDlp ytdlp;
         ytdlp.setBinary(QStringLiteral(FAKE_YTDLP_PATH));
 
+        QTemporaryDir dir;
+        QStringList finishedPaths;
+        QObject::connect(&ytdlp, &YtDlp::downloadFilesFinished,
+                         [&](const QStringList &paths) { finishedPaths = paths; });
+        ytdlp.download(QStringLiteral("https://example.test/playlist"),
+                       dir.path(), QString(), true, true);
+        CHECK(waitFor([&]() { return !finishedPaths.isEmpty(); }));
+        CHECK(finishedPaths.size() == 2);
+        if (finishedPaths.size() == 2) {
+            CHECK(QFileInfo::exists(finishedPaths.at(0)));
+            CHECK(QFileInfo::exists(finishedPaths.at(1)));
+        }
+    }
+
+    // --- 6. Ошибка yt-dlp -------------------------------------------------
+    {
+        YtDlp ytdlp;
+        ytdlp.setBinary(QStringLiteral(FAKE_YTDLP_PATH));
+
         QString error;
         QObject::connect(&ytdlp, &YtDlp::downloadFailed,
                          [&](const QString &message) { error = message; });
@@ -193,7 +212,7 @@ int main(int argc, char **argv)
         CHECK(!ytdlp.isBusy());
     }
 
-    // --- 6. Отмена --------------------------------------------------------
+    // --- 7. Отмена --------------------------------------------------------
     {
         YtDlp ytdlp;
         ytdlp.setBinary(QStringLiteral(FAKE_YTDLP_PATH));
@@ -215,7 +234,7 @@ int main(int argc, char **argv)
         CHECK(!ytdlp.isBusy());
     }
 
-    // --- 7. Отсутствующий бинарник ---------------------------------------
+    // --- 8. Отсутствующий бинарник ---------------------------------------
     {
         YtDlp ytdlp;
         ytdlp.setBinary(QStringLiteral("definitely-not-a-binary-xyz"));

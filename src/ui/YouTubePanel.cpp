@@ -3,6 +3,7 @@
 #include "core/ytdlp/YtDlp.h"
 
 #include <QComboBox>
+#include <QCheckBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -65,25 +66,34 @@ YouTubePanel::YouTubePanel(YtDlp *ytdlp, QWidget *parent)
         setStatus(status);
     });
 
-    connect(m_ytdlp, &YtDlp::downloadFinished, this, [this](const QString &filePath) {
+    connect(m_ytdlp, &YtDlp::downloadFilesFinished, this,
+            [this](const QStringList &filePaths) {
         const Job job = m_job;
         m_job = Job::None;
         m_progress->setRange(0, 100);
         m_progress->setValue(100);
 
-        if (!QFileInfo::exists(filePath)) {
-            setError(tr("Файл не найден после скачивания: %1").arg(filePath));
+        QStringList existing;
+        for (const QString &path : filePaths) {
+            if (QFileInfo::exists(path))
+                existing.append(path);
+        }
+        if (existing.isEmpty()) {
+            setError(tr("Скачанные файлы не найдены"));
             updateUi();
             return;
         }
 
-        const QString name = QFileInfo(filePath).completeBaseName();
         if (job == Job::SaveToLibrary) {
-            setStatus(tr("Сохранено: %1").arg(name));
-            emit fileAdded(filePath);
+            setStatus(tr("Добавлено в библиотеку: %1 файлов").arg(existing.size()));
+            if (existing.size() == 1)
+                emit fileAdded(existing.first());
+            else
+                emit filesAdded(existing);
         } else {
-            setStatus(tr("Играю: %1").arg(name));
-            emit playRequested(filePath);
+            const QString path = existing.first();
+            setStatus(tr("Играю: %1").arg(QFileInfo(path).completeBaseName()));
+            emit playRequested(path);
         }
         updateUi();
     });
@@ -170,6 +180,9 @@ void YouTubePanel::setupUi()
     m_cancelButton->setEnabled(false);
     actionsRow->addWidget(m_playButton);
     actionsRow->addWidget(m_saveButton);
+    m_playlistCheck = new QCheckBox(tr("Плейлист целиком"), this);
+    m_playlistCheck->setToolTip(tr("Скачать URL плейлиста целиком в библиотеку"));
+    actionsRow->addWidget(m_playlistCheck);
     actionsRow->addStretch();
     actionsRow->addWidget(m_cancelButton);
     layout->addLayout(actionsRow);
@@ -191,6 +204,7 @@ void YouTubePanel::setupUi()
     connect(m_searchEdit, &QLineEdit::returnPressed, this, &YouTubePanel::runSearch);
     connect(m_searchEdit, &QLineEdit::textChanged, this, [this]() { updateUi(); });
     connect(m_sourceCombo, &QComboBox::currentIndexChanged, this, [this]() { updateUi(); });
+    connect(m_playlistCheck, &QCheckBox::toggled, this, [this]() { updateUi(); });
     connect(m_playButton, &QPushButton::clicked, this, [this]() { startJob(Job::PlayNow); });
     connect(m_saveButton, &QPushButton::clicked, this, [this]() { startJob(Job::SaveToLibrary); });
     connect(m_cancelButton, &QPushButton::clicked, m_ytdlp, &YtDlp::cancel);
@@ -223,8 +237,19 @@ void YouTubePanel::startJob(Job job)
 {
     QString url;
     QString title;
-    if (!selectedTarget(&url, &title))
+    const bool wholePlaylist = m_playlistCheck->isChecked()
+                               && job == Job::SaveToLibrary;
+    if (wholePlaylist) {
+        url = m_searchEdit->text().trimmed();
+        title = tr("плейлист");
+        if (!url.startsWith(QLatin1String("http://"), Qt::CaseInsensitive)
+            && !url.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)) {
+            setError(tr("Для загрузки плейлиста вставьте ссылку в поле поиска"));
+            return;
+        }
+    } else if (!selectedTarget(&url, &title)) {
         return;
+    }
 
     if (YtDlp::resolveBinary().isEmpty()) {
         setError(tr("yt-dlp не найден. Укажите путь в «Инструменты → Настройки yt-dlp»."));
@@ -239,7 +264,7 @@ void YouTubePanel::startJob(Job job)
         const QString format = QSettings().value(QStringLiteral("ytdlp/audioFormat"),
                                                  QStringLiteral("flac")).toString();
         setStatus(tr("Скачиваю в библиотеку (%1): %2").arg(format, title));
-        m_ytdlp->download(url, YtDlp::libraryDir(), format);
+        m_ytdlp->download(url, YtDlp::libraryDir(), format, true, wholePlaylist);
     } else {
         setStatus(tr("Загружаю для прослушивания: %1").arg(title));
         m_ytdlp->download(url, YtDlp::cacheDir(), QString());
@@ -257,7 +282,13 @@ void YouTubePanel::updateUi()
     m_searchButton->setEnabled(!busy && !m_searchEdit->text().trimmed().isEmpty());
     m_results->setEnabled(!busy);
     m_playButton->setEnabled(!busy && hasSelection);
-    m_saveButton->setEnabled(!busy && hasSelection);
+    const QUrl playlistUrl(m_searchEdit->text().trimmed());
+    const bool canSavePlaylist = m_playlistCheck->isChecked()
+                                 && (playlistUrl.scheme() == QLatin1String("http")
+                                     || playlistUrl.scheme() == QLatin1String("https"))
+                                 && !playlistUrl.host().isEmpty();
+    m_saveButton->setEnabled(!busy && (hasSelection || canSavePlaylist));
+    m_playlistCheck->setEnabled(!busy);
     m_cancelButton->setEnabled(busy && m_ytdlp->mode() == YtDlp::Mode::Downloading);
 
     if (!busy && m_progress->maximum() == 0)
