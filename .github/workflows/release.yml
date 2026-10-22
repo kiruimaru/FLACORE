@@ -68,9 +68,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: FLACORE-${{ matrix.platform }}-x64
-          path: |
-            FLACORE-windows-x64.zip
-            FLACORE-linux-x86_64.AppImage
+          path: ${{ matrix.platform == 'windows' && 'FLACORE-windows-x64.zip' || 'FLACORE-linux-x86_64.AppImage' }}
           if-no-files-found: error
 
   publish:
