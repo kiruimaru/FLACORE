@@ -97,8 +97,16 @@ audio in a selected format. For other Linux distributions and Windows, see
   playback; a second click reuses the cached file
 - **Save to library** — extracts audio to FLAC (default), MP3, Opus or M4A,
   embeds metadata, and drops the track into the playlist
+- Download a playlist URL in one job and add all downloaded tracks to the library
 - Live download progress (percent, speed, ETA), a cancel button, and readable
   errors instead of silent failure
+
+### Appearance
+
+- Dark, light, SoundCloud, Apple Music, Ocean and Sunset themes
+- Hardcore and interactive color editors, JSON theme import/export
+- Optional custom background image
+- Feedback button linking to GitHub Issues
 
 ### Under the hood
 
@@ -242,6 +250,7 @@ If `yt-dlp` is not in `PATH`, point the app at it:
    - **«Слушать»** — download into the cache and start playing right away;
    - **«В библиотеку»** — save to the library folder (FLAC by default) and add
      the track to the playlist.
+   - To download a full playlist, paste its URL and enable «Плейлист целиком».
 5. `Отмена` stops the current download; `Ctrl+Q` quits the app.
 
 Pasting a direct link (`https://…`) into the search field skips the search and
@@ -398,8 +407,8 @@ An honest list — these are real, not hypothetical:
 - **Removing a track above the current one** shifts the model index without
   notifying the view — the selection can point at the wrong row afterwards.
 - **No media keys, no MPRIS, no tray icon.**
-- **No bundled packages yet.** Linux installs include a `.desktop` launcher,
-  but there is no AppImage, Flatpak, or Windows installer.
+- **Packaging is partial.** AppImage and portable Windows ZIP builds are
+  attached to GitHub Releases; Flatpak and a Windows installer are not available.
 - **YouTube may be unreachable** from your network (it is from Russia without a
   proxy). Use the SoundCloud source, or add `--proxy` to `yt-dlp`'s own config.
 
@@ -410,10 +419,14 @@ An honest list — these are real, not hypothetical:
 - [ ] `PlaylistModel : QAbstractListModel` + `QListView` (drag & drop, roles)
 - [ ] tag and cover reading (libavformat or taglib), real library scanning
 - [ ] M3U save/load, shuffle, repeat
+- [x] Download playlist URLs and add all downloaded tracks to the library
+- [x] Theme presets, custom color editors, JSON configs and background images
+- [x] Feedback link to GitHub Issues
 - [ ] download queue instead of one job at a time
 - [ ] MPRIS2 + media keys, tray icon
-- [ ] GitHub Actions: build on Linux + tests
-- [ ] packaging: AppImage / Flatpak / Windows installer
+- [x] GitHub Actions: Linux and Windows builds with tests
+- [x] packaging: Linux AppImage and portable Windows ZIP
+- [ ] packaging: Flatpak and Windows installer
 
 ---
 
@@ -697,6 +710,8 @@ winget install Gyan.FFmpeg         # Windows
    - **«Слушать»** — скачать в кэш и сразу включить;
    - **«В библиотеку»** — сохранить в папку библиотеки (по умолчанию FLAC)
      и добавить трек в плейлист.
+   - Чтобы скачать плейлист целиком, вставьте его URL и включите
+     «Плейлист целиком».
 5. «Отмена» прерывает текущее скачивание, `Ctrl+Q` закрывает приложение.
 
 Если вставить в поле поиска прямую ссылку (`https://…`), поиск пропускается и
@@ -708,6 +723,10 @@ winget install Gyan.FFmpeg         # Windows
 библиотеки и формат сохранения (FLAC / MP3 320 / Opus / M4A). Диалог сразу
 проверяет `yt-dlp --version` и показывает результат. «Инструменты → Открыть
 папку библиотеки» открывает её в файловом менеджере.
+
+«Вид → Тема» предлагает готовые темы, редакторы цветов «Хардкор» и
+«Интерактивный», импорт/экспорт JSON-конфига и выбор фото фона. Кнопка
+`Feedback` открывает GitHub Issues.
 
 ### Как работает интеграция с yt-dlp
 
@@ -844,8 +863,8 @@ FLACORE/
 - **Удаление трека выше текущего** сдвигает индекс модели, не уведомляя
   представление — выделение может указывать не на ту строку.
 - **Нет медиаклавиш, MPRIS и значка в трее.**
-- **Пока нет готовых установочных пакетов.** При установке в Linux создаётся
-  ярлык `.desktop`, но AppImage, Flatpak и установщика для Windows пока нет.
+- **Упаковка частичная.** В GitHub Releases доступны AppImage и portable ZIP
+  для Windows; Flatpak и установщика для Windows пока нет.
 - **YouTube может быть недоступен** из вашей сети (например, из России без
   прокси). Используйте источник SoundCloud или добавьте `--proxy` в конфиг
   самого `yt-dlp`.
@@ -855,10 +874,14 @@ FLACORE/
 - [ ] `PlaylistModel : QAbstractListModel` + `QListView` (drag & drop, роли)
 - [ ] чтение тегов и обложек (libavformat или taglib), сканирование фонотеки
 - [ ] сохранение/загрузка M3U, shuffle, repeat
+- [x] загрузка плейлиста целиком с добавлением треков в библиотеку
+- [x] готовые темы, редакторы цветов, JSON-конфиги и фото фона
+- [x] кнопка Feedback со ссылкой на GitHub Issues
 - [ ] очередь скачивания вместо одной задачи
 - [ ] MPRIS2 + медиаклавиши, значок в трее
-- [ ] GitHub Actions: сборка на Linux + тесты
-- [ ] упаковка: AppImage / Flatpak / установщик для Windows
+- [x] GitHub Actions: сборки Linux и Windows с тестами
+- [x] упаковка: Linux AppImage и portable ZIP для Windows
+- [ ] упаковка: Flatpak и установщик для Windows
 
 ### Решение проблем
 
