@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=FLACORE
+Name[ru]=FLACORE — музыкальный плеер
+GenericName=Music Player
+GenericName[ru]=Музыкальный плеер
+Comment=Local music player with online search
+Comment[ru]=Локальный музыкальный плеер с поиском музыки онлайн
+Exec=flacore
+TryExec=flacore
+Icon=audio-x-generic
+Terminal=false
+StartupNotify=true
+Categories=AudioVideo;Audio;Player;

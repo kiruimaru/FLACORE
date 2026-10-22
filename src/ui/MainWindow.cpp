@@ -494,6 +494,20 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onPositionChanged);
     connect(player, &QMediaPlayer::durationChanged,
             this, &MainWindow::onDurationChanged);
+    connect(player, &QMediaPlayer::mediaStatusChanged, this,
+            [this](QMediaPlayer::MediaStatus status) {
+                if (status != QMediaPlayer::EndOfMedia)
+                    return;
+
+                if (playlist->hasNext()) {
+                    onNext();
+                    return;
+                }
+
+                playButton->setEnabled(playlist->count() > 0);
+                pauseButton->setEnabled(false);
+                playPauseStack->setCurrentWidget(playButton);
+            });
     connect(playlist, &Playlist::trackAdded,
             this, &MainWindow::onPlaylistTrackAdded);
     connect(playlist, &Playlist::currentTrackChanged,
@@ -955,6 +969,11 @@ void MainWindow::onOpenFiles()
 
 void MainWindow::onPlay()
 {
+    if (player->mediaStatus() == QMediaPlayer::EndOfMedia) {
+        player->setPosition(0);
+        progressSlider->setValue(0);
+        currentTimeLabel->setText(QStringLiteral("00:00"));
+    }
     player->play();
     playButton->setEnabled(false);
     pauseButton->setEnabled(true);

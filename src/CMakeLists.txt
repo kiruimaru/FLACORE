@@ -45,3 +45,13 @@ endif()
 if(WIN32)
     set_target_properties(flacore PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
+
+install(TARGETS flacore
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+if(UNIX AND NOT APPLE)
+    install(FILES ${CMAKE_SOURCE_DIR}/packaging/linux/flacore.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+endif()
