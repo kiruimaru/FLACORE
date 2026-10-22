@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/kiruimaru/Projects/FLACORE/build/cmake_install.cmake",
-		"/home/kiruimaru/Projects/FLACORE/build/src/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

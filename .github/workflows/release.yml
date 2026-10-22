@@ -29,6 +29,8 @@ jobs:
           version: 6.8.3
           modules: qtmultimedia
           cache: true
+      - name: Clear stale CMake build cache
+        run: cmake -E rm -rf build
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFLACORE_BUILD_TESTS=ON
       - name: Build and test
