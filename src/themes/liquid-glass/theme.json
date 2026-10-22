@@ -1,0 +1,22 @@
+{
+  "id": "liquid-glass",
+  "name": "Liquid Glass",
+  "description": {
+    "ru": "Стекло и тёплый свет",
+    "en": "Glass and warm light"
+  },
+  "version": "1.0.0",
+  "author": { "name": "FLACORE", "github": "nex1door" },
+  "license": "MIT",
+  "accent": "#ff5500",
+  "background": "#0b0d13",
+  "font": "segui",
+  "mode": "beauty",
+  "tokens": {
+    "radius": 16,
+    "glass-alpha": 0.52,
+    "blur": 26,
+    "sidebar-width": 216,
+    "player-height": 86
+  }
+}

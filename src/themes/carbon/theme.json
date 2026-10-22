@@ -1,0 +1,23 @@
+{
+  "id": "carbon",
+  "name": "Carbon",
+  "description": {
+    "ru": "Графит без свечения",
+    "en": "Graphite, no glow"
+  },
+  "version": "1.0.0",
+  "author": { "name": "FLACORE", "github": "nex1door" },
+  "license": "MIT",
+  "accent": "#d4d4d8",
+  "background": "#101114",
+  "font": "rubik",
+  "mode": "medium",
+  "tokens": {
+    "radius": 8,
+    "glass-alpha": 0.8,
+    "blur": 8,
+    "accent-glow": "#33d4d4d8",
+    "accent-soft": "#26d4d4d8",
+    "border": "#2effffff"
+  }
+}

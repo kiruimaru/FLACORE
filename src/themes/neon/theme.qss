@@ -1,0 +1,31 @@
+/* Neon Night: фиолетово-циaновые градиенты и заметное свечение рамок. */
+
+QWidget[dataUi="app"] {
+    background: @bg-primary;
+}
+
+QWidget[dataUi="player"] {
+    border: 1px solid @accent-glow;
+}
+
+QWidget[dataUi="card"] {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 @panel, stop:1 @accent-soft);
+    border: 1px solid @accent-glow;
+}
+
+QListWidget[dataUi="results"]::item:selected,
+QListWidget[dataUi="sidebar"]::item:selected {
+    background: @accent-soft;
+    border: 1px solid @accent-glow;
+    color: #ffffff;
+}
+
+QPushButton[variant="accent"] {
+    border: 1px solid @accent-hover;
+}
+
+QSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #22d3ee, stop:1 @accent);
+}

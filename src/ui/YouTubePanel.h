@@ -30,6 +30,16 @@ class YouTubePanel : public QWidget
 public:
     explicit YouTubePanel(YtDlp *ytdlp, QWidget *parent = nullptr);
 
+    /**
+     * Найти запрос и сразу выполнить действие с первым результатом.
+     * Нужно разделу «Обзор»: строка чарта превращается в панель YouTube,
+     * где виден прогресс, а плеер получает готовый файл обычным путём.
+     *
+     * provider < 0 — оставить текущий источник и, если ничего не нашлось,
+     * попробовать второй (YouTube ↔ SoundCloud).
+     */
+    void runQuery(const QString &query, int provider, bool saveToLibrary);
+
 signals:
     /** Скачано для прослушивания: можно сразу играть. */
     void playRequested(const QString &filePath);
@@ -46,6 +56,8 @@ private:
 
     void setupUi();
     void runSearch();
+    /// Попробовать второй источник, если в первом ничего не нашлось.
+    bool tryFallbackProvider();
     void startJob(Job job);
     void updateUi();
     void setStatus(const QString &text);
@@ -53,6 +65,12 @@ private:
 
     bool selectedTarget(QString *url, QString *title) const;
     void addResultItem(const YtDlpResult &result);
+    /// Подсказка в списке результатов, пока/если результатов нет.
+    void showResultsHint(const QString &text);
+    /// Следующий подходящий результат поиска (перебор вариантов из «Обзора»).
+    bool selectNextResult();
+    /// Запомнить источник, который сработал: следующий поиск начнётся с него.
+    void rememberProvider();
 
     YtDlp *m_ytdlp = nullptr;
 
@@ -68,6 +86,17 @@ private:
     QLabel *m_status = nullptr;
 
     Job m_job = Job::None;
+    /// Работа, которую нужно запустить сразу после поиска (для «Обзора»).
+    Job m_pendingJob = Job::None;
+    /// Задание пришло из «Обзора»: если трек не скачался (например, DRM),
+    /// имеет смысл попробовать следующую находку.
+    bool m_autoJob = false;
+    Job m_autoJobKind = Job::None;
+    int m_autoAttempts = 0;
+    /// Поиск запущен этой панелью: чужие результаты (чарты) не подставляем.
+    bool m_searchPending = false;
+    /// Второй источник уже пробовали — не зацикливаться.
+    bool m_fallbackTried = false;
 };
 
 #endif // YOUTUBEPANEL_H

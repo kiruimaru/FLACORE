@@ -17,7 +17,7 @@ struct YtDlpResult {
     qint64 durationSec = 0;
 };
 
-/** Формат длительности: 3:45 или 1:02:03. */
+/// Формат длительности: 3:45 или 1:02:03 (минуты без ведущего нуля — как в плеерах).
 inline QString formatDuration(qint64 totalSeconds)
 {
     if (totalSeconds <= 0)
@@ -34,7 +34,7 @@ inline QString formatDuration(qint64 totalSeconds)
     if (hours > 0)
         return QStringLiteral("%1:%2:%3").arg(hours).arg(twoDigits(minutes), twoDigits(seconds));
 
-    return QStringLiteral("%1:%2").arg(twoDigits(minutes), twoDigits(seconds));
+    return QStringLiteral("%1:%2").arg(minutes).arg(twoDigits(seconds));
 }
 
 Q_DECLARE_METATYPE(YtDlpResult)

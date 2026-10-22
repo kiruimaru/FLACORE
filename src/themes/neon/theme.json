@@ -1,0 +1,23 @@
+{
+  "id": "neon",
+  "name": "Neon Night",
+  "description": {
+    "ru": "Неон и плотное свечение",
+    "en": "Neon with heavy glow"
+  },
+  "version": "1.0.0",
+  "author": { "name": "FLACORE", "github": "nex1door" },
+  "license": "MIT",
+  "accent": "#b249f8",
+  "background": "#08060f",
+  "font": "montserrat",
+  "mode": "beauty",
+  "tokens": {
+    "radius": 20,
+    "glass-alpha": 0.45,
+    "blur": 34,
+    "accent-glow": "#80b249f8",
+    "accent-soft": "#33b249f8",
+    "border": "#33b249f8"
+  }
+}

@@ -40,6 +40,35 @@ const char *kSingleJson = R"({
   "webpage_url": "https://soundcloud.com/example/direct-url-track"
 })";
 
+// Ответ для ссылки на чарт (soundcloud.com/charts/...): список записей.
+const char *kChartJson = R"({
+  "_type": "playlist",
+  "entries": [
+    {
+      "id": "chart1",
+      "title": "Chart One",
+      "uploader": "Chart Artist",
+      "duration": 181.0,
+      "webpage_url": "https://soundcloud.com/chart/one",
+      "thumbnails": [{"url": "https://soundcloud.com/img/one.jpg"}]
+    },
+    {
+      "id": "chart2",
+      "title": "Chart Two",
+      "channel": "Second Artist",
+      "duration": null,
+      "url": "https://soundcloud.com/chart/two"
+    },
+    {
+      "id": "chart3",
+      "title": "Chart Three",
+      "uploader": "Third Artist",
+      "duration": 240.0,
+      "webpage_url": "https://soundcloud.com/chart/three"
+    }
+  ]
+})";
+
 const char *kScSearchJson = R"({
   "id": "sc1",
   "title": "SC Search Hit",
@@ -77,6 +106,12 @@ int main(int argc, char **argv)
 
     if (std::strcmp(argv[1], "--version") == 0) {
         std::printf("2026.08.19-fake\n");
+        return 0;
+    }
+
+    // Именно ссылка на чарт SoundCloud, а не любая ссылка со словом «charts».
+    if (hasArg(argc, argv, "soundcloud.com/charts")) {
+        std::printf("%s\n", kChartJson);
         return 0;
     }
 

@@ -1,0 +1,22 @@
+{
+  "id": "sugar-cloud",
+  "name": "Sugar Cloud",
+  "description": {
+    "ru": "Светлая тема, розовый акцент",
+    "en": "Light theme, pink accent"
+  },
+  "version": "1.0.0",
+  "author": { "name": "FLACORE", "github": "nex1door" },
+  "license": "MIT",
+  "accent": "#ec4899",
+  "background": "#f4f5fa",
+  "font": "nunito",
+  "mode": "beauty",
+  "tokens": {
+    "radius": 22,
+    "glass-alpha": 0.72,
+    "blur": 18,
+    "shadow": "#33a1a5b0",
+    "border": "#1f1c1f2b"
+  }
+}
