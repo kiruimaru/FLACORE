@@ -54,7 +54,20 @@ jobs:
           windeployqt --release --compiler-runtime "$exe"
           $appDir = Split-Path $exe
           Copy-Item setup_windows.py, setup_windows.bat $appDir
-          python setup_windows.py --install-dir (Join-Path $appDir "tools")
+          $toolsDir = Join-Path $appDir "tools"
+          python setup_windows.py --install-dir $toolsDir --ffmpeg
+          if (-not (Test-Path (Join-Path $toolsDir "yt-dlp.exe"))) {
+            throw "yt-dlp.exe was not bundled"
+          }
+          if (-not (Test-Path (Join-Path $toolsDir "deno.exe"))) {
+            throw "deno.exe was not bundled"
+          }
+          if (-not (Test-Path (Join-Path $toolsDir "ffmpeg/bin/ffmpeg.exe"))) {
+            throw "ffmpeg.exe was not bundled"
+          }
+          if (-not (Test-Path (Join-Path $toolsDir "ffmpeg/bin/ffprobe.exe"))) {
+            throw "ffprobe.exe was not bundled"
+          }
           Compress-Archive -Path $appDir -DestinationPath "FLACORE-windows-x64.zip"
 
       - name: Package Linux AppImage

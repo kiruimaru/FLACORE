@@ -226,13 +226,13 @@ No development tools are needed to run the release build:
 | Play files already on the computer | Nothing extra |
 | Search/download from YouTube (full current support) | Included in the release ZIP (`yt-dlp.exe` + Deno) |
 | Search/download from SoundCloud | Included in the release ZIP (`yt-dlp.exe`) |
-| Save/convert downloads to FLAC, MP3, Opus or M4A | `ffmpeg.exe` |
+| Save/convert downloads to FLAC, MP3, Opus or M4A | Included in the release ZIP (`ffmpeg.exe` + `ffprobe.exe`) |
 | Compile FLACORE from source | Git, Visual Studio C++ tools, Qt 6.8.3 MSVC 2022 x64, CMake |
 
-The release ZIP includes portable `yt-dlp.exe` and Deno in its `tools` folder,
-so no Python, package manager, or separate install is needed for online search
-and downloads. `ffmpeg` is optional and is only needed to save or convert
-downloads to other audio formats; it is not needed for local playback.
+The release ZIP includes portable `yt-dlp.exe`, Deno, FFmpeg and FFprobe in its
+`tools` folder, so no Python, package manager, or separate install is needed
+for online search, downloads, or audio conversion. FFmpeg is not needed for
+local playback.
 
 1. Open [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases) and
    download `FLACORE-windows-x64.zip` from the release's **Assets** list. Do
@@ -249,8 +249,9 @@ install Qt, Visual Studio, CMake, MSYS2, or Python just to use this archive.
 Local music playback works without the online tools below.
 
 For YouTube and SoundCloud, just run FLACORE from the extracted release folder.
-The ZIP already contains `yt-dlp.exe` and Deno, and FLACORE discovers them in
-the adjacent `tools` folder. Keep that folder beside `flacore.exe`.
+The ZIP already contains `yt-dlp.exe`, Deno, FFmpeg and FFprobe, and FLACORE
+discovers them in the adjacent `tools` folder. Keep that folder beside
+`flacore.exe`.
 
 If you need to refresh those tools manually, install Python 3.10 or newer, open
 PowerShell in the extracted application folder, and run:
@@ -262,15 +263,18 @@ py -3 setup_windows.py --force
 The script downloads the official portable tools and verifies their published
 checksums. The `setup_windows.bat` file runs the same helper by double-clicking.
 
-`ffmpeg` is optional for playback and listening from online sources. Install it
-only if you want to save or convert downloads to the library (the default
-format is FLAC). The helper can download it too, but it is a large download:
+The ready-made release already includes FFmpeg. If you are using an older
+archive or a source checkout, the helper can download it too (it is a large
+download):
 
 ```powershell
 py -3 setup_windows.py --ffmpeg
 ```
 
-This places it in `tools/ffmpeg/bin`, where FLACORE finds it automatically.
+This places both `ffmpeg.exe` and `ffprobe.exe` in `tools/ffmpeg/bin`, where
+FLACORE finds them automatically. If the application still reports that
+`ffprobe` is missing, close FLACORE, run this command from the folder containing
+`setup_windows.py`, and start the application again.
 Alternatively, use `winget install --id Gyan.FFmpeg -e` and select its folder
 in the `ffmpeg` field on the `yt-dlp` page if it is not detected automatically.
 
@@ -920,14 +924,13 @@ cmake --build build -j"$(nproc)"
 | Слушать файлы, которые уже есть на компьютере | Ничего дополнительно |
 | Искать/скачивать с YouTube (полная актуальная поддержка) | Уже в ZIP релиза (`yt-dlp.exe` + Deno) |
 | Искать/скачивать с SoundCloud | Уже в ZIP релиза (`yt-dlp.exe`) |
-| Сохранять/конвертировать скачанное в FLAC, MP3, Opus или M4A | `ffmpeg.exe` |
+| Сохранять/конвертировать скачанное в FLAC, MP3, Opus или M4A | Уже в ZIP релиза (`ffmpeg.exe` + `ffprobe.exe`) |
 | Собирать FLACORE из исходников | Git, инструменты C++ Visual Studio, Qt 6.8.3 MSVC 2022 x64, CMake |
 
-В ZIP релиза уже есть переносимые `yt-dlp.exe` и Deno в папке `tools`, поэтому
-для поиска и скачивания музыки не нужно отдельно устанавливать Python,
-менеджер пакетов или эти инструменты. `ffmpeg` необязателен и нужен только для
-сохранения или конвертации загрузок в другие аудиоформаты; для локального
-воспроизведения он не требуется.
+В ZIP релиза уже есть переносимые `yt-dlp.exe`, Deno, FFmpeg и FFprobe в папке
+`tools`, поэтому для поиска, скачивания и конвертации музыки не нужно отдельно
+устанавливать Python, менеджер пакетов или эти инструменты. Для локального
+воспроизведения FFmpeg не требуется.
 
 1. Откройте [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases) и
    скачайте `FLACORE-windows-x64.zip` из списка **Assets** у нужного релиза.
@@ -944,8 +947,9 @@ cmake --build build -j"$(nproc)"
 можно слушать без дополнительных онлайн-инструментов.
 
 Для YouTube и SoundCloud просто запустите FLACORE из распакованной папки
-релиза. В ZIP уже находятся `yt-dlp.exe` и Deno; FLACORE находит их в соседней
-папке `tools`. Не переносите `tools` отдельно от `flacore.exe`.
+релиза. В ZIP уже находятся `yt-dlp.exe`, Deno, FFmpeg и FFprobe; FLACORE
+находит их в соседней папке `tools`. Не переносите `tools` отдельно от
+`flacore.exe`.
 
 Если нужно вручную обновить инструменты, установите Python 3.10 или новее,
 откройте PowerShell в папке приложения и выполните:
@@ -958,18 +962,17 @@ py -3 setup_windows.py --force
 опубликованные контрольные суммы. То же самое запускает двойной щелчок по
 `setup_windows.bat`.
 
-`ffmpeg` не требуется для воспроизведения или прослушивания онлайн. Он нужен
-только для сохранения или конвертации скачанного в библиотеку (по умолчанию —
-FLAC):
+Готовый архив релиза уже содержит FFmpeg. Если используется старый архив или
+сборка из исходников, скачайте его вручную (это большой файл):
 
 ```powershell
 py -3 setup_windows.py --ffmpeg
 ```
 
-Это скачает FFmpeg в `tools/ffmpeg/bin`, откуда FLACORE определит его
-автоматически. Также можно установить его через `winget install --id
-Gyan.FFmpeg -e`; если программа не найдёт его сама, укажите папку с
-`ffmpeg.exe` в разделе `yt-dlp`.
+Это скачает `ffmpeg.exe` и `ffprobe.exe` в `tools/ffmpeg/bin`, откуда FLACORE
+определит их автоматически. Также можно установить FFmpeg через `winget
+install --id Gyan.FFmpeg -e`; если программа не найдёт его сама, укажите папку
+с `ffmpeg.exe` в разделе `yt-dlp`.
 
 Если Windows сообщает об отсутствующей DLL `VCRUNTIME` или `MSVCP`, установите
 последнюю [Microsoft Visual C++ Redistributable для x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
