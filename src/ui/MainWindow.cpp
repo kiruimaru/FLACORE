@@ -127,6 +127,17 @@ void MainWindow::setupUi()
     m_nav->setCurrentRow(0);
     sidebarLayout->addWidget(m_nav, 1);
 
+    auto *feedbackButton = new QPushButton(tr("Feedback"), sidebar);
+    feedbackButton->setObjectName(QStringLiteral("feedbackButton"));
+    feedbackButton->setProperty("variant", "ghost");
+    feedbackButton->setToolTip(tr("Открыть GitHub Issues"));
+    feedbackButton->setIcon(Icons::icon(Icons::Kind::Link,
+                                        ThemeUtil::color(QStringLiteral("text-muted"), Qt::gray), 16));
+    connect(feedbackButton, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/kiruimaru/FLACORE/issues")));
+    });
+    sidebarLayout->addWidget(feedbackButton);
+
     auto *menuButton = new QPushButton(tr("Меню"), sidebar);
     menuButton->setProperty("variant", "ghost");
     menuButton->setIcon(Icons::icon(Icons::Kind::Menu,

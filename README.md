@@ -22,7 +22,7 @@ A local music player written in C++17 / Qt 6. It plays your own library and pull
 music from YouTube, SoundCloud and 1000+ other sites through **yt-dlp** — search,
 listen immediately, or save to a FLAC library, all inside the same window.
 
-**Status:** 0.4.1 — early, actively breaking. The `Discover` section now shows live
+**Status:** 0.4.2 — early, actively breaking. The `Discover` section now shows live
 charts (Deezer, Apple Music, SoundCloud). Read
 [Known limitations](#known-limitations) before expecting it to behave like foobar2000.
 
@@ -224,14 +224,15 @@ No development tools are needed to run the release build:
 | What you want to do | What must be installed |
 |---|---|
 | Play files already on the computer | Nothing extra |
-| Search/download from YouTube (full current support) | `yt-dlp.exe` + Deno 2.3.0+ |
-| Search/download from SoundCloud | `yt-dlp.exe` |
+| Search/download from YouTube (full current support) | Included in the release ZIP (`yt-dlp.exe` + Deno) |
+| Search/download from SoundCloud | Included in the release ZIP (`yt-dlp.exe`) |
 | Save/convert downloads to FLAC, MP3, Opus or M4A | `ffmpeg.exe` |
 | Compile FLACORE from source | Git, Visual Studio C++ tools, Qt 6.8.3 MSVC 2022 x64, CMake |
 
-The release ZIP does not contain `yt-dlp`, Deno, or `ffmpeg`; those are separate
-tools used by the online/download features. They are not needed for local
-playback.
+The release ZIP includes portable `yt-dlp.exe` and Deno in its `tools` folder,
+so no Python, package manager, or separate install is needed for online search
+and downloads. `ffmpeg` is optional and is only needed to save or convert
+downloads to other audio formats; it is not needed for local playback.
 
 1. Open [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases) and
    download `FLACORE-windows-x64.zip` from the release's **Assets** list. Do
@@ -247,55 +248,31 @@ Microsoft compiler runtime deployed by the release workflow. Do not separately
 install Qt, Visual Studio, CMake, MSYS2, or Python just to use this archive.
 Local music playback works without the online tools below.
 
-For online search and downloads, open **Windows Terminal** or **PowerShell**
-(open Start, type `PowerShell`, and press Enter). Paste these commands one at a
-time and press Enter after each. If Windows asks to approve an installation or
-package source, read the prompt and confirm it:
+For YouTube and SoundCloud, just run FLACORE from the extracted release folder.
+The ZIP already contains `yt-dlp.exe` and Deno, and FLACORE discovers them in
+the adjacent `tools` folder. Keep that folder beside `flacore.exe`.
+
+If you need to refresh those tools manually, install Python 3.10 or newer, open
+PowerShell in the extracted application folder, and run:
 
 ```powershell
-winget --version
-winget install --id yt-dlp.yt-dlp -e
-winget install --id DenoLand.Deno -e
+py -3 setup_windows.py --force
 ```
 
-If `winget --version` says the command was not found, install or update
-**App Installer** from the Microsoft Store, then close and reopen PowerShell.
-
-`yt-dlp` handles search and downloads. Current yt-dlp releases need a JavaScript
-runtime such as Deno (version 2.3.0 or newer) for full YouTube support; Deno is
-not required for SoundCloud. The official standalone `yt-dlp.exe` already
-includes yt-dlp-ejs; Python and a separate EJS package are not needed. Close
-and reopen FLACORE after installing so it can see the updated `PATH`.
-
-To check the installation, open a new PowerShell window and run:
-
-```powershell
-yt-dlp --version
-deno --version
-```
-
-If automatic detection does not find `yt-dlp`, open the `yt-dlp` section in
-FLACORE and browse to `yt-dlp.exe`. If `winget` is unavailable, download
-`yt-dlp.exe` from the [official yt-dlp releases](https://github.com/yt-dlp/yt-dlp/releases/latest),
-save it in a folder you will keep (for example, `C:\Tools\yt-dlp\`), then use
-the Browse button in FLACORE to select it. Install Deno from the [official
-installation instructions](https://docs.deno.com/runtime/getting_started/installation/)
-or its [official Windows release](https://github.com/denoland/deno/releases/latest);
-keep `deno.exe` in `PATH` or beside `yt-dlp.exe`.
+The script downloads the official portable tools and verifies their published
+checksums. The `setup_windows.bat` file runs the same helper by double-clicking.
 
 `ffmpeg` is optional for playback and listening from online sources. Install it
 only if you want to save or convert downloads to the library (the default
-format is FLAC):
+format is FLAC). The helper can download it too, but it is a large download:
 
 ```powershell
-winget install --id Gyan.FFmpeg -e
+py -3 setup_windows.py --ffmpeg
 ```
 
-After installation, restart FLACORE. In the `yt-dlp` section, make sure the
-`ffmpeg` field points to the folder containing `ffmpeg.exe`; use **Browse** if
-it is not detected automatically. If `winget` is unavailable, download a
-Windows build from [Gyan's FFmpeg builds](https://www.gyan.dev/ffmpeg/builds/),
-extract it, then select the folder containing `ffmpeg.exe` with **Browse**.
+This places it in `tools/ffmpeg/bin`, where FLACORE finds it automatically.
+Alternatively, use `winget install --id Gyan.FFmpeg -e` and select its folder
+in the `ffmpeg` field on the `yt-dlp` page if it is not detected automatically.
 
 If Windows reports a missing `VCRUNTIME` or `MSVCP` DLL, install the latest
 [Microsoft Visual C++ Redistributable for x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
@@ -753,7 +730,7 @@ GPL-3.0 — see [LICENSE](LICENSE).
 с YouTube, SoundCloud и ещё 1000+ сайтов через **yt-dlp**: поиск, мгновенное
 прослушивание или сохранение в библиотеку FLAC — всё в одном окне.
 
-**Статус:** 0.4.1 — ранняя версия, всё ещё ломается. В разделе «Обзор» появились
+**Статус:** 0.4.2 — ранняя версия, всё ещё ломается. В разделе «Обзор» появились
 живые чарты (Deezer, Apple Music, SoundCloud). Перед тем как ждать поведения
 foobar2000, прочитайте [Ограничения](#ограничения).
 
@@ -941,13 +918,16 @@ cmake --build build -j"$(nproc)"
 | Что нужно делать | Что установить |
 |---|---|
 | Слушать файлы, которые уже есть на компьютере | Ничего дополнительно |
-| Искать/скачивать с YouTube (полная актуальная поддержка) | `yt-dlp.exe` + Deno 2.3.0+ |
-| Искать/скачивать с SoundCloud | `yt-dlp.exe` |
+| Искать/скачивать с YouTube (полная актуальная поддержка) | Уже в ZIP релиза (`yt-dlp.exe` + Deno) |
+| Искать/скачивать с SoundCloud | Уже в ZIP релиза (`yt-dlp.exe`) |
 | Сохранять/конвертировать скачанное в FLAC, MP3, Opus или M4A | `ffmpeg.exe` |
 | Собирать FLACORE из исходников | Git, инструменты C++ Visual Studio, Qt 6.8.3 MSVC 2022 x64, CMake |
 
-В ZIP релиза нет `yt-dlp`, Deno и `ffmpeg`: это отдельные инструменты для
-онлайн-функций и конвертации. Для локального воспроизведения они не нужны.
+В ZIP релиза уже есть переносимые `yt-dlp.exe` и Deno в папке `tools`, поэтому
+для поиска и скачивания музыки не нужно отдельно устанавливать Python,
+менеджер пакетов или эти инструменты. `ffmpeg` необязателен и нужен только для
+сохранения или конвертации загрузок в другие аудиоформаты; для локального
+воспроизведения он не требуется.
 
 1. Откройте [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases) и
    скачайте `FLACORE-windows-x64.zip` из списка **Assets** у нужного релиза.
@@ -963,56 +943,33 @@ cmake --build build -j"$(nproc)"
 отдельно ставить Qt, Visual Studio, CMake, MSYS2 или Python. Локальную музыку
 можно слушать без дополнительных онлайн-инструментов.
 
-Для поиска и скачивания музыки откройте **Терминал Windows** или
-**PowerShell** (нажмите Пуск, введите `PowerShell` и нажмите Enter).
-Сначала вставьте `winget --version` и нажмите Enter. Если Windows сообщает,
-что команда не найдена, установите или обновите **App Installer** в Microsoft
-Store, затем закройте и снова откройте PowerShell. Если команда вывела версию,
-вставьте следующие команды по одной и после каждой нажмите Enter. Если Windows
-попросит подтвердить установку или источник пакета, прочитайте запрос и
-подтвердите его:
+Для YouTube и SoundCloud просто запустите FLACORE из распакованной папки
+релиза. В ZIP уже находятся `yt-dlp.exe` и Deno; FLACORE находит их в соседней
+папке `tools`. Не переносите `tools` отдельно от `flacore.exe`.
+
+Если нужно вручную обновить инструменты, установите Python 3.10 или новее,
+откройте PowerShell в папке приложения и выполните:
 
 ```powershell
-winget install --id yt-dlp.yt-dlp -e
-winget install --id DenoLand.Deno -e
+py -3 setup_windows.py --force
 ```
 
-`yt-dlp` отвечает за поиск и скачивание. Для поддержки YouTube актуальным
-версиям yt-dlp нужна среда JavaScript, например Deno версии 2.3.0 или новее;
-для SoundCloud Deno не требуется. Официальный отдельный `yt-dlp.exe` уже
-содержит yt-dlp-ejs; Python и отдельный пакет EJS устанавливать не нужно.
-После установки закройте и снова откройте FLACORE, чтобы программа увидела
-обновлённый `PATH`.
-
-Проверьте установку в новом окне PowerShell:
-
-```powershell
-yt-dlp --version
-deno --version
-```
-
-Если `yt-dlp` не определился автоматически, откройте слева раздел `yt-dlp` и
-выберите файл `yt-dlp.exe` кнопкой обзора. Если `winget` недоступен, скачайте
-`yt-dlp.exe` со [страницы официальных релизов](https://github.com/yt-dlp/yt-dlp/releases/latest),
-сохраните в папку, которую не будете удалять (например, `C:\Tools\yt-dlp\`),
-затем выберите файл в FLACORE кнопкой обзора. Установите Deno по [официальной
-инструкции](https://docs.deno.com/runtime/getting_started/installation/) или
-скачайте его с [официальной страницы релизов](https://github.com/denoland/deno/releases/latest).
-`deno.exe` должен находиться в `PATH` или рядом с `yt-dlp.exe`.
+Скрипт скачает официальные переносимые версии инструментов и проверит
+опубликованные контрольные суммы. То же самое запускает двойной щелчок по
+`setup_windows.bat`.
 
 `ffmpeg` не требуется для воспроизведения или прослушивания онлайн. Он нужен
 только для сохранения или конвертации скачанного в библиотеку (по умолчанию —
 FLAC):
 
 ```powershell
-winget install --id Gyan.FFmpeg -e
+py -3 setup_windows.py --ffmpeg
 ```
 
-После установки перезапустите FLACORE. В разделе `yt-dlp` проверьте поле
-`ffmpeg`: в нём должна быть папка с `ffmpeg.exe`. Если путь не определился,
-укажите папку кнопкой обзора. Если `winget` недоступен, скачайте сборку
-Windows со [страницы Gyan с FFmpeg](https://www.gyan.dev/ffmpeg/builds/),
-распакуйте архив и кнопкой обзора выберите папку, где лежит `ffmpeg.exe`.
+Это скачает FFmpeg в `tools/ffmpeg/bin`, откуда FLACORE определит его
+автоматически. Также можно установить его через `winget install --id
+Gyan.FFmpeg -e`; если программа не найдёт его сама, укажите папку с
+`ffmpeg.exe` в разделе `yt-dlp`.
 
 Если Windows сообщает об отсутствующей DLL `VCRUNTIME` или `MSVCP`, установите
 последнюю [Microsoft Visual C++ Redistributable для x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)

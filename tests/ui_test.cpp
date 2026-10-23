@@ -103,7 +103,7 @@ int main(int argc, char **argv)
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("FLACORE"));
     QCoreApplication::setApplicationName(QStringLiteral("ui-test"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.4.1"));
+    QCoreApplication::setApplicationVersion(QStringLiteral("0.4.2"));
     QStandardPaths::setTestModeEnabled(true);
 
     // Тест должен быть герметичным: чистим настройки от прошлых прогонов,
@@ -154,9 +154,12 @@ int main(int argc, char **argv)
     auto *backdrop = window.findChild<AuroraBackdrop *>();
     auto *playlist = window.findChild<Playlist *>();
     auto *youtube = window.findChild<YouTubePanel *>();
+    auto *feedbackButton = window.findChild<QPushButton *>(QStringLiteral("feedbackButton"));
 
     check(nav && nav->count() == 5, QStringLiteral("в сайдбаре 5 разделов"));
     check(pages && pages->count() == 5, QStringLiteral("в стеке 5 страниц"));
+    check(feedbackButton && feedbackButton->text() == QLatin1String("Feedback"),
+          QStringLiteral("кнопка Feedback открывает доступ к GitHub Issues"));
     check(library && playerBar && backdrop, QStringLiteral("библиотека, панель плеера и подложка на месте"));
     check(playlist != nullptr, QStringLiteral("плейлист найден как владелец состояния"));
     check(youtube != nullptr, QStringLiteral("панель загрузки найдена"));

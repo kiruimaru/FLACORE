@@ -38,6 +38,11 @@ jobs:
           cmake --build build --config Release --parallel
           ctest --test-dir build -C Release --output-on-failure
 
+      - uses: actions/setup-python@v5
+        if: matrix.platform == 'windows'
+        with:
+          python-version: "3.12"
+
       - name: Package Windows
         if: matrix.platform == 'windows'
         shell: pwsh
@@ -47,7 +52,10 @@ jobs:
             Select-Object -First 1).FullName
           if (-not $exe) { throw "flacore.exe was not produced" }
           windeployqt --release --compiler-runtime "$exe"
-          Compress-Archive -Path (Split-Path $exe) -DestinationPath "FLACORE-windows-x64.zip"
+          $appDir = Split-Path $exe
+          Copy-Item setup_windows.py, setup_windows.bat $appDir
+          python setup_windows.py --install-dir (Join-Path $appDir "tools")
+          Compress-Archive -Path $appDir -DestinationPath "FLACORE-windows-x64.zip"
 
       - name: Package Linux AppImage
         if: matrix.platform == 'linux'

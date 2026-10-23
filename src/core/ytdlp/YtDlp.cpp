@@ -9,6 +9,7 @@
 #include <QJsonValue>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QCoreApplication>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStringList>
@@ -40,6 +41,12 @@ QString lastMeaningfulLine(const QString &text)
     }
     return QString();
 }
+
+QString bundledToolPath(const QString &relativePath)
+{
+    return QDir(QCoreApplication::applicationDirPath()).filePath(
+        QStringLiteral("tools/") + relativePath);
+}
 } // namespace
 
 YtDlp::YtDlp(QObject *parent)
@@ -66,6 +73,11 @@ QString YtDlp::resolveBinary()
     const QString configured = QSettings().value(QStringLiteral("ytdlp/binary")).toString().trimmed();
     if (!configured.isEmpty())
         return configured;
+
+    const QString bundled = bundledToolPath(QStringLiteral("yt-dlp.exe"));
+    if (QFileInfo(bundled).isFile())
+        return bundled;
+
     return QStandardPaths::findExecutable(QStringLiteral("yt-dlp"));
 }
 
@@ -74,6 +86,17 @@ QString YtDlp::resolveFfmpegDir()
     const QString configured = QSettings().value(QStringLiteral("ytdlp/ffmpegDir")).toString().trimmed();
     if (!configured.isEmpty())
         return configured;
+
+    const QStringList bundledCandidates = {
+        bundledToolPath(QStringLiteral("ffmpeg/bin")),
+        bundledToolPath(QStringLiteral("ffmpeg")),
+    };
+    for (const QString &candidate : bundledCandidates) {
+        if (QFileInfo(QDir(candidate).filePath(QStringLiteral("ffmpeg.exe"))).isFile()
+            || QFileInfo(QDir(candidate).filePath(QStringLiteral("ffmpeg"))).isFile()) {
+            return candidate;
+        }
+    }
 
     const QString ffmpeg = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
     if (!ffmpeg.isEmpty())
@@ -242,6 +265,14 @@ void YtDlp::startProcess(const QStringList &args)
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert(QStringLiteral("PYTHONIOENCODING"), QStringLiteral("utf-8"));
     env.insert(QStringLiteral("PYTHONUTF8"), QStringLiteral("1"));
+    const QStringList toolPaths = {
+        bundledToolPath(QString()),
+        bundledToolPath(QStringLiteral("ffmpeg/bin")),
+    };
+    const QString currentPath = env.value(QStringLiteral("PATH"));
+    env.insert(QStringLiteral("PATH"),
+               toolPaths.join(QDir::listSeparator())
+                   + (currentPath.isEmpty() ? QString() : QDir::listSeparator() + currentPath));
     m_process->setProcessEnvironment(env);
     m_process->setProcessChannelMode(QProcess::SeparateChannels);
 
