@@ -56,6 +56,11 @@ Press `Super+Alt+Space`, search for **FLACORE**, and press Enter. In Omarchy,
 audio in a selected format. For other Linux distributions and Windows, see
 [Build](#build).
 
+On Windows, users who only want to run FLACORE should download the ready-made
+`FLACORE-windows-x64.zip` from [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases).
+They do not need to install a compiler, Qt, CMake, or Python; see the Windows
+steps in [Build](#build).
+
 ---
 
 ## Table of contents
@@ -170,11 +175,12 @@ Copy the ones you like into `docs/` and link them here.
 | CMake | build | 3.21+ |
 | Qt 6: `Core`, `Gui`, `Widgets`, `Multimedia`, `Network` | UI, playback and background image download | 6.5+ (tested on 6.12) |
 | `yt-dlp` | online search / download | recent (tested 2026.08.19) |
-| `ffmpeg` binary | **only** for saving as FLAC/MP3/Opus | 4.x+ |
+| `ffmpeg` binary | **only** for saving/converting audio to FLAC/MP3/Opus/M4A | 4.x+ |
 | Qt Multimedia backend | actual audio output | `qt6-multimedia-ffmpeg` on Linux |
 
 `ffmpeg` is optional: listening works without it because the stream is cached
-as-is. Saving to FLAC/MP3/Opus needs it, since that is a re-encode.
+as-is. Saving to the library in FLAC/MP3/Opus/M4A needs it for audio
+post-processing. Local playback does not need the separate `ffmpeg` executable.
 
 FFmpeg **dev** packages (`libavcodec-dev` etc.) are **not** needed. If you want
 them anyway, configure with `-DFLACORE_USE_FFMPEG_LIBS=ON`.
@@ -211,7 +217,93 @@ cmake --build build -j"$(nproc)"
 ./build/src/flacore
 ```
 
-### Windows — MSYS2 (recommended, verified)
+### Windows — run the ready-made release (recommended for users)
+
+No development tools are needed to run the release build:
+
+| What you want to do | What must be installed |
+|---|---|
+| Play files already on the computer | Nothing extra |
+| Search/download from YouTube (full current support) | `yt-dlp.exe` + Deno 2.3.0+ |
+| Search/download from SoundCloud | `yt-dlp.exe` |
+| Save/convert downloads to FLAC, MP3, Opus or M4A | `ffmpeg.exe` |
+| Compile FLACORE from source | Git, Visual Studio C++ tools, Qt 6.8.3 MSVC 2022 x64, CMake |
+
+The release ZIP does not contain `yt-dlp`, Deno, or `ffmpeg`; those are separate
+tools used by the online/download features. They are not needed for local
+playback.
+
+1. Open [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases) and
+   download `FLACORE-windows-x64.zip` from the release's **Assets** list. Do
+   not download the automatically generated **Source code** archive.
+2. In File Explorer, right-click the ZIP and choose **Extract All**. Extract
+   the whole archive; do not try to run `flacore.exe` from inside the ZIP.
+3. In the extracted files, open the folder that contains `flacore.exe` (it may
+   be inside a `Release` subfolder) and run it. Keep the other files and
+   subfolders there; they contain the Qt libraries and plugins.
+
+The archive is for 64-bit Windows and includes the Qt runtime files and the
+Microsoft compiler runtime deployed by the release workflow. Do not separately
+install Qt, Visual Studio, CMake, MSYS2, or Python just to use this archive.
+Local music playback works without the online tools below.
+
+For online search and downloads, open **Windows Terminal** or **PowerShell**
+(open Start, type `PowerShell`, and press Enter). Paste these commands one at a
+time and press Enter after each. If Windows asks to approve an installation or
+package source, read the prompt and confirm it:
+
+```powershell
+winget --version
+winget install --id yt-dlp.yt-dlp -e
+winget install --id DenoLand.Deno -e
+```
+
+If `winget --version` says the command was not found, install or update
+**App Installer** from the Microsoft Store, then close and reopen PowerShell.
+
+`yt-dlp` handles search and downloads. Current yt-dlp releases need a JavaScript
+runtime such as Deno (version 2.3.0 or newer) for full YouTube support; Deno is
+not required for SoundCloud. The official standalone `yt-dlp.exe` already
+includes yt-dlp-ejs; Python and a separate EJS package are not needed. Close
+and reopen FLACORE after installing so it can see the updated `PATH`.
+
+To check the installation, open a new PowerShell window and run:
+
+```powershell
+yt-dlp --version
+deno --version
+```
+
+If automatic detection does not find `yt-dlp`, open the `yt-dlp` section in
+FLACORE and browse to `yt-dlp.exe`. If `winget` is unavailable, download
+`yt-dlp.exe` from the [official yt-dlp releases](https://github.com/yt-dlp/yt-dlp/releases/latest),
+save it in a folder you will keep (for example, `C:\Tools\yt-dlp\`), then use
+the Browse button in FLACORE to select it. Install Deno from the [official
+installation instructions](https://docs.deno.com/runtime/getting_started/installation/)
+or its [official Windows release](https://github.com/denoland/deno/releases/latest);
+keep `deno.exe` in `PATH` or beside `yt-dlp.exe`.
+
+`ffmpeg` is optional for playback and listening from online sources. Install it
+only if you want to save or convert downloads to the library (the default
+format is FLAC):
+
+```powershell
+winget install --id Gyan.FFmpeg -e
+```
+
+After installation, restart FLACORE. In the `yt-dlp` section, make sure the
+`ffmpeg` field points to the folder containing `ffmpeg.exe`; use **Browse** if
+it is not detected automatically. If `winget` is unavailable, download a
+Windows build from [Gyan's FFmpeg builds](https://www.gyan.dev/ffmpeg/builds/),
+extract it, then select the folder containing `ffmpeg.exe` with **Browse**.
+
+If Windows reports a missing `VCRUNTIME` or `MSVCP` DLL, install the latest
+[Microsoft Visual C++ Redistributable for x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+and restart FLACORE. If SmartScreen warns that the publisher is unknown, first
+verify that the ZIP came from the FLACORE GitHub Releases page; the release is
+not code-signed.
+
+### Windows — build from source with MSYS2 (verified)
 
 Install [MSYS2](https://www.msys2.org/) and open the **UCRT64** shell:
 
@@ -231,16 +323,53 @@ cmake --build build -j 8
 Running the `.exe` outside the MSYS2 shell needs the Qt DLLs nearby — either add
 `C:\msys64\ucrt64\bin` to `PATH` or run `windeployqt build/src/flacore.exe`.
 
-### Windows — MSVC
+### Windows — build from source with Visual Studio
 
-Requires Qt 6 for MSVC (online installer) **and** the Windows 10/11 SDK. Build
-Tools alone are not enough: without the SDK, `cl.exe` cannot compile anything.
+To compile FLACORE yourself, install these components first:
 
-```bat
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 ^
-      -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
-cmake --build build --config Release
+1. Install [Git for Windows](https://git-scm.com/download/win).
+2. Install [Visual Studio Community 2022](https://visualstudio.microsoft.com/vs/community/)
+   or [Visual Studio Build Tools 2022](https://visualstudio.microsoft.com/downloads/).
+   In Visual Studio Installer, select the **Desktop development with C++**
+   workload and a Windows 10 or 11 SDK. Make sure the MSVC v143 x64/x86 build
+   tools are selected.
+3. Install [Qt 6.8.3](https://www.qt.io/download-qt-installer-oss) with the Qt
+   online installer. Expand Qt 6.8.3 and select **MSVC 2022 64-bit** plus the
+   **Qt Multimedia** module. The other required modules (`Core`, `Gui`,
+   `Widgets`, and `Network`) are included in this kit. The compiler and Qt kit
+   must both be MSVC 2022 64-bit; do not select MinGW for this build.
+4. Install [CMake 3.21 or newer](https://cmake.org/download/) and enable its
+   option to add CMake to `PATH`.
+
+Open **Developer PowerShell for VS 2022** (or **x64 Native Tools Command
+Prompt**). Clone the repository and enter its folder:
+
+```powershell
+git clone https://github.com/kiruimaru/FLACORE.git
+cd FLACORE
 ```
+
+If Qt was installed somewhere other than `C:\Qt`, change the `$Qt` path below:
+
+```powershell
+$Qt = "C:/Qt/6.8.3/msvc2022_64"
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+  "-DCMAKE_PREFIX_PATH=$Qt" -DFLACORE_BUILD_TESTS=ON
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+```
+
+To run the locally built executable outside the Qt development environment,
+deploy its Qt runtime files from the same PowerShell window:
+
+```powershell
+& "$Qt\bin\windeployqt.exe" --release --compiler-runtime `
+  ".\build\src\Release\flacore.exe"
+.\build\src\Release\flacore.exe
+```
+
+This source-build setup is not needed when using the ready-made release ZIP
+above.
 
 ### FreeBSD / other Unices
 
@@ -254,8 +383,9 @@ The CMake files are portable; install `qt6-base`, `qt6-multimedia`, `cmake` and
 pipx install yt-dlp                # or: pip install --user -U yt-dlp
 sudo pacman -S yt-dlp              # Arch
 winget install yt-dlp.yt-dlp       # Windows
+winget install DenoLand.Deno       # JavaScript runtime for full YouTube support
 
-# ffmpeg (only for FLAC/MP3/Opus export)
+# ffmpeg (only for saving/converting to FLAC/MP3/Opus/M4A)
 sudo apt install ffmpeg            # Debian/Ubuntu
 winget install Gyan.FFmpeg         # Windows
 ```
@@ -763,12 +893,13 @@ update-desktop-database "$HOME/.local/share/applications"
 | CMake | сборка | 3.21+ |
 | Qt 6: `Core`, `Gui`, `Widgets`, `Multimedia`, `Network` | интерфейс, воспроизведение, загрузка фона по ссылке | 6.5+ (проверено на 6.12) |
 | `yt-dlp` | поиск и скачивание | свежий (проверено 2026.08.19) |
-| бинарник `ffmpeg` | **только** для сохранения в FLAC/MP3/Opus | 4.x+ |
+| бинарник `ffmpeg` | **только** для сохранения/конвертации в FLAC/MP3/Opus/M4A | 4.x+ |
 | бэкенд Qt Multimedia | собственно звук | `qt6-multimedia-ffmpeg` на Linux |
 
 `ffmpeg` необязателен: прослушивание работает без него, потому что поток
-кэшируется как есть. Сохранение в FLAC/MP3/Opus — это перекодирование, ему
-`ffmpeg` нужен.
+кэшируется как есть. Сохранение в библиотеку в форматах FLAC/MP3/Opus/M4A
+требует `ffmpeg` для обработки аудио. Для локального воспроизведения отдельный
+бинарник `ffmpeg` не нужен.
 
 Пакеты FFmpeg **для разработки** (`libavcodec-dev` и т.п.) не требуются. Если
 всё же нужны — конфигурируйте с `-DFLACORE_USE_FFMPEG_LIBS=ON`.
@@ -803,7 +934,93 @@ cmake --build build -j"$(nproc)"
 ./build/src/flacore
 ```
 
-**Windows — MSYS2 (рекомендуется, проверено)**
+**Windows — запуск готового релиза (рекомендуется обычным пользователям)**
+
+Для запуска не нужны инструменты разработки:
+
+| Что нужно делать | Что установить |
+|---|---|
+| Слушать файлы, которые уже есть на компьютере | Ничего дополнительно |
+| Искать/скачивать с YouTube (полная актуальная поддержка) | `yt-dlp.exe` + Deno 2.3.0+ |
+| Искать/скачивать с SoundCloud | `yt-dlp.exe` |
+| Сохранять/конвертировать скачанное в FLAC, MP3, Opus или M4A | `ffmpeg.exe` |
+| Собирать FLACORE из исходников | Git, инструменты C++ Visual Studio, Qt 6.8.3 MSVC 2022 x64, CMake |
+
+В ZIP релиза нет `yt-dlp`, Deno и `ffmpeg`: это отдельные инструменты для
+онлайн-функций и конвертации. Для локального воспроизведения они не нужны.
+
+1. Откройте [GitHub Releases](https://github.com/kiruimaru/FLACORE/releases) и
+   скачайте `FLACORE-windows-x64.zip` из списка **Assets** у нужного релиза.
+   Не скачивайте автоматически созданный архив **Source code**.
+2. В Проводнике нажмите ZIP правой кнопкой и выберите **Извлечь все**. Извлеките
+   весь архив; не запускайте `flacore.exe` прямо внутри ZIP.
+3. Найдите в распакованных файлах папку с `flacore.exe` (он может быть во
+   вложенной папке `Release`) и запустите его. Не удаляйте и не переносите
+   отдельно от него остальные файлы и папки: там находятся Qt DLL и плагины.
+
+Архив собран для 64-разрядной Windows и содержит файлы Qt и распространяемую
+среду Microsoft C++, добавленные при сборке релиза. Для запуска архива не нужно
+отдельно ставить Qt, Visual Studio, CMake, MSYS2 или Python. Локальную музыку
+можно слушать без дополнительных онлайн-инструментов.
+
+Для поиска и скачивания музыки откройте **Терминал Windows** или
+**PowerShell** (нажмите Пуск, введите `PowerShell` и нажмите Enter).
+Сначала вставьте `winget --version` и нажмите Enter. Если Windows сообщает,
+что команда не найдена, установите или обновите **App Installer** в Microsoft
+Store, затем закройте и снова откройте PowerShell. Если команда вывела версию,
+вставьте следующие команды по одной и после каждой нажмите Enter. Если Windows
+попросит подтвердить установку или источник пакета, прочитайте запрос и
+подтвердите его:
+
+```powershell
+winget install --id yt-dlp.yt-dlp -e
+winget install --id DenoLand.Deno -e
+```
+
+`yt-dlp` отвечает за поиск и скачивание. Для поддержки YouTube актуальным
+версиям yt-dlp нужна среда JavaScript, например Deno версии 2.3.0 или новее;
+для SoundCloud Deno не требуется. Официальный отдельный `yt-dlp.exe` уже
+содержит yt-dlp-ejs; Python и отдельный пакет EJS устанавливать не нужно.
+После установки закройте и снова откройте FLACORE, чтобы программа увидела
+обновлённый `PATH`.
+
+Проверьте установку в новом окне PowerShell:
+
+```powershell
+yt-dlp --version
+deno --version
+```
+
+Если `yt-dlp` не определился автоматически, откройте слева раздел `yt-dlp` и
+выберите файл `yt-dlp.exe` кнопкой обзора. Если `winget` недоступен, скачайте
+`yt-dlp.exe` со [страницы официальных релизов](https://github.com/yt-dlp/yt-dlp/releases/latest),
+сохраните в папку, которую не будете удалять (например, `C:\Tools\yt-dlp\`),
+затем выберите файл в FLACORE кнопкой обзора. Установите Deno по [официальной
+инструкции](https://docs.deno.com/runtime/getting_started/installation/) или
+скачайте его с [официальной страницы релизов](https://github.com/denoland/deno/releases/latest).
+`deno.exe` должен находиться в `PATH` или рядом с `yt-dlp.exe`.
+
+`ffmpeg` не требуется для воспроизведения или прослушивания онлайн. Он нужен
+только для сохранения или конвертации скачанного в библиотеку (по умолчанию —
+FLAC):
+
+```powershell
+winget install --id Gyan.FFmpeg -e
+```
+
+После установки перезапустите FLACORE. В разделе `yt-dlp` проверьте поле
+`ffmpeg`: в нём должна быть папка с `ffmpeg.exe`. Если путь не определился,
+укажите папку кнопкой обзора. Если `winget` недоступен, скачайте сборку
+Windows со [страницы Gyan с FFmpeg](https://www.gyan.dev/ffmpeg/builds/),
+распакуйте архив и кнопкой обзора выберите папку, где лежит `ffmpeg.exe`.
+
+Если Windows сообщает об отсутствующей DLL `VCRUNTIME` или `MSVCP`, установите
+последнюю [Microsoft Visual C++ Redistributable для x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+и перезапустите FLACORE. Если SmartScreen сообщает о неизвестном издателе,
+сначала убедитесь, что архив скачан со страницы GitHub Releases проекта: у
+релиза нет цифровой подписи.
+
+**Windows — сборка из исходников через MSYS2 (проверено)**
 
 Установите [MSYS2](https://www.msys2.org/) и откройте оболочку **UCRT64**:
 
@@ -824,16 +1041,52 @@ cmake --build build -j 8
 добавьте `C:\msys64\ucrt64\bin` в `PATH`, либо выполните
 `windeployqt build/src/flacore.exe`.
 
-**Windows — MSVC**
+**Windows — сборка из исходников через Visual Studio**
 
-Нужны Qt 6 для MSVC (онлайн-установщик) **и** Windows 10/11 SDK. Одних Build
-Tools недостаточно: без SDK `cl.exe` не соберёт вообще ничего.
+Если хотите самостоятельно скомпилировать FLACORE, сначала установите:
 
-```bat
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 ^
-      -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
-cmake --build build --config Release
+1. Установите [Git for Windows](https://git-scm.com/download/win).
+2. Установите [Visual Studio Community 2022](https://visualstudio.microsoft.com/vs/community/)
+   или [Visual Studio Build Tools 2022](https://visualstudio.microsoft.com/downloads/).
+   В Visual Studio Installer выберите компонент
+   **Разработка классических приложений на C++** и Windows 10/11 SDK. Проверьте,
+   что также выбран компилятор MSVC v143 для x64/x86.
+3. Установите [Qt 6.8.3](https://www.qt.io/download-qt-installer-oss) через
+   онлайн-установщик Qt. В списке Qt 6.8.3 отметьте комплект **MSVC 2022
+   64-bit** и модуль **Qt Multimedia**. Остальные необходимые модули (`Core`,
+   `Gui`, `Widgets`, `Network`) входят в этот комплект. Для этой сборки и
+   компилятор, и Qt должны быть MSVC 2022 64-bit; вариант MinGW не подходит.
+4. Установите [CMake версии 3.21 или новее](https://cmake.org/download/) и
+   включите добавление CMake в `PATH`.
+
+Откройте **Developer PowerShell for VS 2022** (или **x64 Native Tools Command
+Prompt**). Склонируйте проект и перейдите в его папку:
+
+```powershell
+git clone https://github.com/kiruimaru/FLACORE.git
+cd FLACORE
 ```
+
+Если Qt установлен не в `C:\Qt`, измените путь в переменной `$Qt`:
+
+```powershell
+$Qt = "C:/Qt/6.8.3/msvc2022_64"
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+  "-DCMAKE_PREFIX_PATH=$Qt" -DFLACORE_BUILD_TESTS=ON
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+```
+
+Чтобы запускать собранную программу вне среды Qt, разверните необходимые Qt
+DLL из того же PowerShell:
+
+```powershell
+& "$Qt\bin\windeployqt.exe" --release --compiler-runtime `
+  ".\build\src\Release\flacore.exe"
+.\build\src\Release\flacore.exe
+```
+
+Эти шаги сборки не нужны, если вы скачали готовый ZIP релиза.
 
 **FreeBSD и другие Unix**
 
@@ -847,8 +1100,9 @@ CMake-файлы портируемы: поставьте `qt6-base`, `qt6-multi
 pipx install yt-dlp                # или: pip install --user -U yt-dlp
 sudo pacman -S yt-dlp              # Arch
 winget install yt-dlp.yt-dlp       # Windows
+winget install DenoLand.Deno       # JavaScript runtime для полной поддержки YouTube
 
-# ffmpeg (только для экспорта в FLAC/MP3/Opus)
+# ffmpeg (только для сохранения/конвертации в FLAC/MP3/Opus/M4A)
 sudo apt install ffmpeg            # Debian/Ubuntu
 winget install Gyan.FFmpeg         # Windows
 ```
