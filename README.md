@@ -158,12 +158,10 @@ steps in [Build](#build).
 ---
 
 ## Screenshots
+<img width="1300" height="1000" alt="image" src="https://github.com/user-attachments/assets/2ccf4975-9897-4b1b-a622-5130b08bc6d7" />
+<img width="1300" height="1000" alt="image" src="https://github.com/user-attachments/assets/a1dd10f1-5974-4049-832e-7438635da1b6" />
+<img width="1300" height="1000" alt="image" src="https://github.com/user-attachments/assets/f40ff7ab-c946-427c-8c7c-4e2160fc5cf4" />
 
-Screenshots are produced by the UI test (`ctest --test-dir build` writes them into
-`build/tests/screenshots/`): `liquid-glass.png`, `neon.png`, `sugar-cloud.png`,
-`page-discover.png`, `page-appearance.png`, `page-appearance-bottom.png`,
-`page-youtube.png`.
-Copy the ones you like into `docs/` and link them here.
 
 ---
 
@@ -860,11 +858,9 @@ update-desktop-database "$HOME/.local/share/applications"
 
 ### Скриншоты
 
-Скриншоты делает интерфейсный тест (`ctest --test-dir build` кладёт их в
-`build/tests/screenshots/`): `liquid-glass.png`, `neon.png`, `sugar-cloud.png`,
-`page-discover.png`, `page-appearance.png`, `page-appearance-bottom.png`,
-`page-youtube.png`.
-Скопируйте понравившиеся в `docs/` и добавьте ссылки сюда.
+<img width="1300" height="1000" alt="image" src="https://github.com/user-attachments/assets/2ccf4975-9897-4b1b-a622-5130b08bc6d7" />
+<img width="1300" height="1000" alt="image" src="https://github.com/user-attachments/assets/a1dd10f1-5974-4049-832e-7438635da1b6" />
+<img width="1300" height="1000" alt="image" src="https://github.com/user-attachments/assets/f40ff7ab-c946-427c-8c7c-4e2160fc5cf4" />
 
 ### Требования
 
@@ -916,6 +912,9 @@ cmake --build build -j"$(nproc)"
 ```
 
 **Windows — запуск готового релиза (рекомендуется обычным пользователям)**
+
+<img width="411" height="393" alt="image" src="https://github.com/user-attachments/assets/0cb27cf7-98c9-4309-bd1d-25a920d7ba35" />
+
 
 Для запуска не нужны инструменты разработки:
 
