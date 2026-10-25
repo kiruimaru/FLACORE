@@ -62,6 +62,7 @@ private:
     QLineEdit *m_backgroundPath = nullptr;
     QSlider *m_backgroundBlur = nullptr;
     QComboBox *m_fontCombo = nullptr;
+    QLineEdit *m_customFontEdit = nullptr;   // Issue #10: поле для пользовательского шрифта
     QSlider *m_fontScale = nullptr;
     QComboBox *m_modeCombo = nullptr;
     QSlider *m_radiusSlider = nullptr;

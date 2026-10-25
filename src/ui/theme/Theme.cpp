@@ -9,7 +9,10 @@
 #include <QJsonValue>
 #include <QObject>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QtMath>
+
+#include <algorithm>
 
 namespace {
 
@@ -245,7 +248,7 @@ QStringList availableFontIds()
     return {QStringLiteral("segui"),      QStringLiteral("inter"),    QStringLiteral("manrope"),
             QStringLiteral("onest"),      QStringLiteral("golos"),    QStringLiteral("montserrat"),
             QStringLiteral("rubik"),      QStringLiteral("nunito"),   QStringLiteral("raleway"),
-            QStringLiteral("comfortaa"),  QStringLiteral("system")};
+            QStringLiteral("comfortaa"),  QStringLiteral("system"),   QStringLiteral("custom")};
 }
 
 QStringList fontFamiliesFor(const QString &fontId)
@@ -270,6 +273,11 @@ QStringList fontFamiliesFor(const QString &fontId)
     if (id == QLatin1String("comfortaa"))
         return {QStringLiteral("Comfortaa"), QStringLiteral("Segoe UI")};
     if (id == QLatin1String("system"))
+        return {};
+    // "custom" — пользователь вводит имя семейства вручную (хранится в QSettings).
+    // Семейство берётся из настройки appearance/customFontFamily; возвращаем пустой
+    // список, чтобы вызывающий код использовал значение напрямую через QSettings.
+    if (id == QLatin1String("custom"))
         return {};
     // По умолчанию — системный шрифт, самый предсказуемый на Windows.
     return {QStringLiteral("Segoe UI Variable Text"), QStringLiteral("Segoe UI"),
@@ -481,6 +489,26 @@ ResolvedTokens resolveTokens(const Theme &theme, const AppearanceOverrides &over
     QString fontId = overrides.font.isEmpty() ? theme.font : overrides.font;
     const QStringList families = fontFamiliesFor(fontId);
     QString family = pickInstalledFamily(families);
+
+    // Issue #10: поддержка пользовательского шрифта ("custom").
+    // Если выбран "custom" — берём имя семейства напрямую из настройки
+    // appearance/customFontFamily и проверяем его наличие в системе.
+    if (fontId == QLatin1String("custom")) {
+        const QString customFamily = QSettings().value(
+            QStringLiteral("appearance/customFontFamily")).toString().trimmed();
+        if (!customFamily.isEmpty()) {
+            // Проверяем, есть ли такое семейство в системе.
+            const QStringList installed = QFontDatabase::families();
+            const bool found = std::any_of(installed.constBegin(), installed.constEnd(),
+                                           [&customFamily](const QString &f) {
+                                               return f.compare(customFamily, Qt::CaseInsensitive) == 0;
+                                           });
+            if (found)
+                family = customFamily;
+            else
+                family = customFamily; // Передаём как есть — Qt сам подберёт замену.
+        }
+    }
 
     resolved.isLight = light;
     resolved.accent = accent.isValid() ? accent : QColor(QStringLiteral("#ff5500"));

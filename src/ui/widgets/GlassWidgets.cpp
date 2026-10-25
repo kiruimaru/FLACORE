@@ -90,8 +90,16 @@ void GlassPanel::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing, true);
 
     const qreal radius = m_radius >= 0 ? m_radius : ThemeUtil::number(QStringLiteral("radius"), 16);
-    const QColor fill = m_strong ? ThemeUtil::color(QStringLiteral("panel-strong"))
-                                 : ThemeUtil::color(QStringLiteral("panel"));
+
+    // Issue #7: учитываем glass-alpha для корректной прозрачности стеклянных панелей.
+    // Токен glass-alpha (0.0..1.0) масштабирует непрозрачность заливки.
+    const qreal glassAlpha = ThemeUtil::number(QStringLiteral("glass-alpha"), qreal(0.55));
+
+    QColor fill = m_strong ? ThemeUtil::color(QStringLiteral("panel-strong"))
+                           : ThemeUtil::color(QStringLiteral("panel"));
+    // Применяем glass-alpha: масштабируем альфа-канал уже полупрозрачного fill.
+    fill.setAlphaF(qBound(0.0, fill.alphaF() * (0.5 + glassAlpha * 0.5), 1.0));
+
     QColor border = ThemeUtil::color(QStringLiteral("border"));
     if (m_hovered)
         border = ThemeUtil::color(QStringLiteral("border-strong"), border);
@@ -116,9 +124,12 @@ void GlassPanel::paintEvent(QPaintEvent *)
     painter.setBrush(fill);
     painter.drawPath(path);
 
-    // Блик сверху — «стекло».
+    // Блик сверху — «стекло». Интенсивность масштабируется с glass-alpha (Issue #7).
     QLinearGradient highlight(panel.topLeft(), panel.bottomLeft());
-    const QColor top = ThemeUtil::isLight() ? QColor(255, 255, 255, 140) : QColor(255, 255, 255, 26);
+    const int highlightAlpha = ThemeUtil::isLight()
+        ? int(140 * glassAlpha)
+        : int(qBound(0.0, 26 * glassAlpha * 2.0, 80.0));
+    const QColor top = QColor(255, 255, 255, highlightAlpha);
     highlight.setColorAt(0.0, top);
     highlight.setColorAt(1.0, Qt::transparent);
     painter.setBrush(highlight);

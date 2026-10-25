@@ -100,6 +100,9 @@ QString fontDisplayName(const QString &id)
         return QStringLiteral("Comfortaa");
     if (id == QLatin1String("system"))
         return QStringLiteral("Системный");
+    // Issue #10: пользовательский шрифт — показываем "Свой шрифт".
+    if (id == QLatin1String("custom"))
+        return QStringLiteral("Свой шрифт…");
     return id;
 }
 
@@ -443,13 +446,44 @@ void AppearancePage::buildTypeCard(QWidget *parent, QVBoxLayout *layout)
     row->addWidget(m_fontCombo, 1);
     content->addLayout(row);
 
+    // Issue #10: поле ввода для пользовательского шрифта ("Свой шрифт…").
+    // Видно только когда выбрано "custom".
+    auto *customRow = new QHBoxLayout();
+    customRow->setSpacing(10);
+    auto *customLabel = new QLabel(tr("Имя семейства"), parent);
+    customLabel->setProperty("role", "caption");
+    customLabel->setMinimumWidth(190);
+    customRow->addWidget(customLabel);
+    m_customFontEdit = new QLineEdit(parent);
+    m_customFontEdit->setPlaceholderText(tr("Например: JetBrains Mono, Ubuntu, Roboto…"));
+    const QString savedCustomFont = QSettings().value(
+        QStringLiteral("appearance/customFontFamily")).toString();
+    m_customFontEdit->setText(savedCustomFont);
+    customRow->addWidget(m_customFontEdit, 1);
+    content->addLayout(customRow);
+
+    // Показываем/скрываем поле ввода в зависимости от выбранного шрифта.
+    const bool isCustom = m_fontCombo->currentData().toString() == QLatin1String("custom");
+    customLabel->setVisible(isCustom);
+    m_customFontEdit->setVisible(isCustom);
+
     QLabel *scaleLabel = nullptr;
     m_fontScale = addSliderRow(parent, content, tr("Масштаб текста, %"), 80, 150, 100, &scaleLabel);
 
-    connect(m_fontCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+    connect(m_fontCombo, &QComboBox::currentIndexChanged, this, [this, customLabel](int index) {
         if (index < 0)
             return;
-        ThemeManager::instance()->setFontOverride(m_fontCombo->itemData(index).toString());
+        const QString id = m_fontCombo->itemData(index).toString();
+        const bool custom = (id == QLatin1String("custom"));
+        customLabel->setVisible(custom);
+        m_customFontEdit->setVisible(custom);
+        ThemeManager::instance()->setFontOverride(id);
+    });
+    connect(m_customFontEdit, &QLineEdit::textChanged, this, [](const QString &text) {
+        // Сохраняем имя шрифта и перезагружаем тему.
+        QSettings().setValue(QStringLiteral("appearance/customFontFamily"), text.trimmed());
+        if (ThemeManager *mgr = ThemeManager::instance())
+            mgr->setFontOverride(QStringLiteral("custom"));
     });
     connect(m_fontScale, &QSlider::valueChanged, this, [this, scaleLabel](int value) {
         scaleLabel->setText(QStringLiteral("%1%").arg(value));
@@ -651,6 +685,19 @@ void AppearancePage::refreshControls()
             fontId = manager->currentTheme().font;
         const int index = m_fontCombo->findData(fontId);
         m_fontCombo->setCurrentIndex(index >= 0 ? index : 0);
+
+        // Issue #10: обновляем видимость поля пользовательского шрифта.
+        const bool isCustom = (m_fontCombo->currentData().toString() == QLatin1String("custom"));
+        if (m_customFontEdit) {
+            m_customFontEdit->setVisible(isCustom);
+            // Обновляем поле, если значение изменилось снаружи.
+            const QString savedCustomFont = QSettings().value(
+                QStringLiteral("appearance/customFontFamily")).toString();
+            if (m_customFontEdit->text() != savedCustomFont) {
+                const QSignalBlocker blockEdit(m_customFontEdit);
+                m_customFontEdit->setText(savedCustomFont);
+            }
+        }
     }
     {
         const QSignalBlocker block(m_fontScale);

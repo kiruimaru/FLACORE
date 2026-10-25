@@ -145,7 +145,9 @@ QString soundCloudChartUrl(const QString &genreSlug)
 {
     const QString slug = genreSlug.trimmed().isEmpty() ? QStringLiteral("all-music")
                                                        : genreSlug.trimmed();
-    return QStringLiteral("https://soundcloud.com/charts/top?genre=%1").arg(slug);
+    // Используем on.soundcloud.com — yt-dlp корректно разбирает именно этот хост.
+    // soundcloud.com/charts вызывал ошибку парсинга (Issue #8).
+    return QStringLiteral("https://on.soundcloud.com/charts/top?genre=%1").arg(slug);
 }
 
 QList<ChartTrack> chartTracksFromYtDlp(const QList<YtDlpResult> &results)
