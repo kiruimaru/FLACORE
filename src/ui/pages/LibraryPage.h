@@ -53,9 +53,11 @@ signals:
     void clearRequested();
     void trackActivated(int row);
     void filesDropped(const QStringList &paths);
+    void fetchCoverRequested(int row);
 
 private:
     void refreshEmptyState();
+    void openContextMenuFor(const QPoint &pos);
 
     TrackListWidget *m_list = nullptr;
     TrackDelegate *m_delegate = nullptr;

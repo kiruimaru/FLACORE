@@ -47,6 +47,11 @@ Info read(const QString &filePath);
 /// Длительность в миллисекундах только для уже открытого буфера (для тестов).
 qint64 flacDurationMs(const QByteArray &file, bool *ok = nullptr);
 
+/// Установка обложки в аудиофайл (Issue #14): вшивает картинку через ffmpeg
+/// и сохраняет обложку рядом с файлом.
+bool saveCoverToFile(const QString &audioPath, const QImage &coverImage,
+                     const QString &ffmpegDir = QString());
+
 } // namespace MediaTags
 
 #endif // MEDIATAGS_H

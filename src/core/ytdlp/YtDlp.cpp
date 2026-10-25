@@ -141,6 +141,25 @@ void YtDlp::checkAvailability()
     startProcess(QStringList{QStringLiteral("--version")});
 }
 
+/// Нормализует ссылку SoundCloud: заменяет soundcloud.com/ на on.soundcloud.com/
+/// чтобы yt-dlp мог корректно получить метаданные и загрузить трек.
+static QString normalizeSoundCloudUrl(const QString &url)
+{
+    static const QLatin1String kSoundCloudHost("soundcloud.com/");
+    static const QLatin1String kOnSoundCloudHost("on.soundcloud.com/");
+
+    const int schemeEnd = url.indexOf(QLatin1String("://"));
+    if (schemeEnd < 0)
+        return url;
+
+    const QString afterScheme = url.mid(schemeEnd + 3);
+    if (afterScheme.startsWith(kSoundCloudHost, Qt::CaseInsensitive)
+        && !afterScheme.startsWith(kOnSoundCloudHost, Qt::CaseInsensitive)) {
+        return url.left(schemeEnd + 3) + QStringLiteral("on.") + afterScheme;
+    }
+    return url;
+}
+
 void YtDlp::search(const QString &query, int limit, Provider provider)
 {
     const QString text = query.trimmed();
@@ -150,7 +169,7 @@ void YtDlp::search(const QString &query, int limit, Provider provider)
     QStringList args;
     if (text.startsWith(QLatin1String("http://"), Qt::CaseInsensitive)
         || text.startsWith(QLatin1String("https://"), Qt::CaseInsensitive)) {
-        args << text << QStringLiteral("--no-playlist");
+        args << normalizeSoundCloudUrl(text) << QStringLiteral("--no-playlist");
     } else {
         const QString prefix = (provider == Provider::SoundCloud)
                                    ? QStringLiteral("scsearch")
@@ -176,7 +195,7 @@ void YtDlp::browse(const QString &url, int limit)
         return;
 
     QStringList args;
-    args << text
+    args << normalizeSoundCloudUrl(text)
          << QStringLiteral("--flat-playlist")
          << QStringLiteral("--dump-single-json")
          << QStringLiteral("--skip-download")
@@ -196,6 +215,7 @@ void YtDlp::download(const QString &url, const QString &outputDir,
     if (url.trimmed().isEmpty() || isBusy())
         return;
 
+    const QString normalizedUrl = normalizeSoundCloudUrl(url.trimmed());
     QDir().mkpath(outputDir);
 
     QStringList args;
@@ -208,8 +228,11 @@ void YtDlp::download(const QString &url, const QString &outputDir,
              << QStringLiteral("-x")
              << QStringLiteral("--audio-format") << audioFormat
              << QStringLiteral("--audio-quality") << QStringLiteral("0");
-        if (embedMetadata)
-            args << QStringLiteral("--embed-metadata") << QStringLiteral("--add-metadata");
+        if (embedMetadata) {
+            // Issue #14: --embed-thumbnail автоматически вшивает обложку трека из SC/YT
+            args << QStringLiteral("--embed-metadata") << QStringLiteral("--add-metadata")
+                 << QStringLiteral("--embed-thumbnail");
+        }
 
         const QString ffmpegDir = resolveFfmpegDir();
         if (!ffmpegDir.isEmpty())
@@ -228,7 +251,7 @@ void YtDlp::download(const QString &url, const QString &outputDir,
         ? QStringLiteral("%(title)s [%(id)s].%(ext)s")
         : QStringLiteral("%(artist,uploader,channel)s - %(title)s.%(ext)s");
     args << QStringLiteral("-o") << QDir(outputDir).filePath(nameTemplate);
-    args << url.trimmed();
+    args << normalizedUrl;
 
     m_mode = Mode::Downloading;
     m_downloadedFiles.clear();

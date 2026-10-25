@@ -117,11 +117,15 @@ PlayerBar::PlayerBar(QWidget *parent)
     m_stop->setToolTip(tr("Стоп"));
     m_next = new IconButton(Icons::Kind::Next, QStringLiteral("transport"), 38, this);
     m_next->setToolTip(tr("Следующий трек"));
+    m_repeat = new IconButton(Icons::Kind::Repeat, QStringLiteral("transport"), 38, this);
+    m_repeat->setToolTip(tr("Автоповтор плейлиста"));
+    m_repeat->setIconColorToken(QStringLiteral("text-muted"));
 
     transport->addWidget(m_previous);
     transport->addWidget(m_playPause);
     transport->addWidget(m_stop);
     transport->addWidget(m_next);
+    transport->addWidget(m_repeat);
     layout->addLayout(transport);
 
     auto *volumeRow = new QHBoxLayout();
@@ -143,6 +147,9 @@ PlayerBar::PlayerBar(QWidget *parent)
     connect(m_stop, &QPushButton::clicked, this, &PlayerBar::stopRequested);
     connect(m_next, &QPushButton::clicked, this, &PlayerBar::nextRequested);
     connect(m_previous, &QPushButton::clicked, this, &PlayerBar::previousRequested);
+    connect(m_repeat, &QPushButton::clicked, this, [this]() {
+        emit repeatToggled(!m_repeatActive);
+    });
     connect(m_seek, &SeekBar::sliderMoved, this, &PlayerBar::seekRequested);
     connect(m_volume, &QSlider::valueChanged, this, &PlayerBar::volumeChanged);
     connect(m_volume, &QSlider::valueChanged, this, [this](int value) {
@@ -210,6 +217,17 @@ void PlayerBar::setControlsEnabled(bool enabled)
 {
     m_playPause->setEnabled(enabled);
     m_stop->setEnabled(enabled);
+    m_repeat->setEnabled(enabled);
+    m_repeat->refreshIcon();
+}
+
+void PlayerBar::setRepeat(bool repeat)
+{
+    m_repeatActive = repeat;
+    m_repeat->setIconColorToken(repeat ? QStringLiteral("accent") : QStringLiteral("text-muted"));
+    m_repeat->setToolTip(repeat ? tr("Автоповтор плейлиста (включен)")
+                                : tr("Автоповтор плейлиста (выключен)"));
+    m_repeat->refreshIcon();
 }
 
 void PlayerBar::setNavigationEnabled(bool previous, bool next)

@@ -146,17 +146,39 @@ void Playlist::setCurrentIndex(int index)
     emit currentTrackChanged(index);
 }
 
+void Playlist::setRepeatEnabled(bool enabled)
+{
+    if (m_repeatEnabled == enabled)
+        return;
+    m_repeatEnabled = enabled;
+    emit repeatModeChanged(enabled);
+}
+
+void Playlist::updateTrackCover(int index, const QImage &cover)
+{
+    if (index < 0 || index >= int(tracks.size()))
+        return;
+    tracks[index].cover = scaledCover(cover);
+    emit trackCoverUpdated(index);
+}
+
 bool Playlist::hasNext() const
 {
     if (tracks.empty())
         return false;
     if (m_currentIndex < 0)
         return true;   // ничего не выбрано — следующий = первый
+    if (m_repeatEnabled)
+        return true;   // циклический переход (Issue #13)
     return m_currentIndex < int(tracks.size()) - 1;
 }
 
 bool Playlist::hasPrevious() const
 {
+    if (tracks.empty())
+        return false;
+    if (m_repeatEnabled)
+        return true;
     return m_currentIndex > 0;
 }
 
@@ -164,14 +186,20 @@ void Playlist::next()
 {
     if (!hasNext())
         return;
-    setCurrentIndex(m_currentIndex < 0 ? 0 : m_currentIndex + 1);
+    if (m_repeatEnabled && m_currentIndex >= int(tracks.size()) - 1)
+        setCurrentIndex(0);
+    else
+        setCurrentIndex(m_currentIndex < 0 ? 0 : m_currentIndex + 1);
 }
 
 void Playlist::previous()
 {
     if (!hasPrevious())
         return;
-    setCurrentIndex(m_currentIndex - 1);
+    if (m_repeatEnabled && m_currentIndex <= 0)
+        setCurrentIndex(int(tracks.size()) - 1);
+    else
+        setCurrentIndex(m_currentIndex - 1);
 }
 
 QStringList Playlist::getAllPaths() const
