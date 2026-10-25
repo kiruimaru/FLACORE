@@ -52,6 +52,8 @@ private slots:
     void onPrevious();
     void onSeek(int positionMs);
     void onVolumeChanged(int value);
+    void onRepeatToggled(bool enabled);
+    void onFetchCoverRequested(int row);
     void onTrackActivated(int row);
     void onPlaylistTrackAdded(int index);
     void onPlaylistTrackRemoved(int index);

@@ -49,6 +49,13 @@ public:
     int currentIndex() const { return m_currentIndex; }
     void setCurrentIndex(int index);
 
+    /// Автоматический повтор плейлиста (Issue #13).
+    bool isRepeatEnabled() const { return m_repeatEnabled; }
+    void setRepeatEnabled(bool enabled);
+
+    /// Обновить обложку трека в памяти (Issue #14).
+    void updateTrackCover(int index, const QImage &cover);
+
     bool hasNext() const;
     bool hasPrevious() const;
     /// Переход вперёд: если ничего не выбрано, начинает с первого трека.
@@ -62,10 +69,13 @@ signals:
     void trackRemoved(int index);
     void currentTrackChanged(int index);
     void playlistCleared();
+    void repeatModeChanged(bool enabled);
+    void trackCoverUpdated(int index);
 
 private:
     std::vector<Track> tracks;
-    int m_currentIndex;
+    int m_currentIndex = -1;
+    bool m_repeatEnabled = false;
 };
 
 #endif // PLAYLIST_H

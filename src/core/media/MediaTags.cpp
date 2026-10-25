@@ -1,8 +1,13 @@
 #include "MediaTags.h"
 
+#include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
+#include <QStandardPaths>
 #include <QStringList>
+#include <QTemporaryFile>
 
 namespace {
 
@@ -495,7 +500,110 @@ Info read(const QString &filePath)
         info.title = QFileInfo(filePath).fileName();
     if (info.artist.isEmpty())
         info.artist = QStringLiteral("Unknown");
+
+    // Если встроенной обложки нет, ищем обложку в папке рядом с файлом (Issue #14).
+    if (!info.hasCover()) {
+        const QDir dir = QFileInfo(filePath).dir();
+        const QString baseName = QFileInfo(filePath).completeBaseName();
+        const QStringList candidates = {
+            dir.filePath(baseName + QStringLiteral(".jpg")),
+            dir.filePath(baseName + QStringLiteral(".png")),
+            dir.filePath(QStringLiteral("cover.jpg")),
+            dir.filePath(QStringLiteral("cover.png")),
+            dir.filePath(QStringLiteral("folder.jpg")),
+            dir.filePath(QStringLiteral("folder.png"))
+        };
+        for (const QString &cand : candidates) {
+            if (QFileInfo::exists(cand)) {
+                QFile f(cand);
+                if (f.open(QIODevice::ReadOnly)) {
+                    info.coverData = f.readAll();
+                    info.coverMime = cand.endsWith(QLatin1String(".png"), Qt::CaseInsensitive)
+                        ? QStringLiteral("image/png") : QStringLiteral("image/jpeg");
+                    break;
+                }
+            }
+        }
+    }
+
     return info;
+}
+
+bool saveCoverToFile(const QString &audioPath, const QImage &coverImage,
+                     const QString &ffmpegDir)
+{
+    if (audioPath.isEmpty() || coverImage.isNull())
+        return false;
+
+    const QFileInfo fileInfo(audioPath);
+    if (!fileInfo.exists())
+        return false;
+
+    const QString dirPath = fileInfo.absolutePath();
+    const QString baseName = fileInfo.completeBaseName();
+    const QString sidecarJpg = QDir(dirPath).filePath(baseName + QStringLiteral(".jpg"));
+    const QString folderJpg = QDir(dirPath).filePath(QStringLiteral("cover.jpg"));
+
+    // 1. Сохраняем обложку рядом с файлом (для локального кэша и плееров)
+    coverImage.save(sidecarJpg, "JPG", 92);
+    if (!QFileInfo::exists(folderJpg))
+        coverImage.save(folderJpg, "JPG", 92);
+
+    // 2. Встраиваем в аудиофайл через ffmpeg, если доступен
+    QString ffmpegExecutable;
+    if (!ffmpegDir.isEmpty()) {
+        const QString candidate = QDir(ffmpegDir).filePath(QStringLiteral("ffmpeg"));
+        const QString candidateExe = QDir(ffmpegDir).filePath(QStringLiteral("ffmpeg.exe"));
+        if (QFileInfo::exists(candidateExe))
+            ffmpegExecutable = candidateExe;
+        else if (QFileInfo::exists(candidate))
+            ffmpegExecutable = candidate;
+    }
+    if (ffmpegExecutable.isEmpty())
+        ffmpegExecutable = QStandardPaths::findExecutable(QStringLiteral("ffmpeg"));
+
+    if (ffmpegExecutable.isEmpty())
+        return true; // картинка сохранена рядом, встроенный тег пропущен без ffmpeg
+
+    QTemporaryFile tempCover;
+    tempCover.setFileTemplate(QDir::tempPath() + QStringLiteral("/flacore_cover_XXXXXX.jpg"));
+    if (!tempCover.open())
+        return true;
+    coverImage.save(&tempCover, "JPG", 95);
+    tempCover.flush();
+
+    const QString ext = fileInfo.suffix().toLower();
+    const QString tempOut = QDir::tempPath() + QStringLiteral("/flacore_tagged_%1.%2")
+                                .arg(QString::number(QCoreApplication::applicationPid()), ext);
+    QFile::remove(tempOut);
+
+    QStringList args;
+    args << QStringLiteral("-y")
+         << QStringLiteral("-i") << audioPath
+         << QStringLiteral("-i") << tempCover.fileName()
+         << QStringLiteral("-map") << QStringLiteral("0:a")
+         << QStringLiteral("-map") << QStringLiteral("1:v")
+         << QStringLiteral("-c") << QStringLiteral("copy");
+
+    if (ext == QLatin1String("mp3")) {
+        args << QStringLiteral("-id3v2_version") << QStringLiteral("3")
+             << QStringLiteral("-metadata:s:v") << QStringLiteral("title=Album cover")
+             << QStringLiteral("-metadata:s:v") << QStringLiteral("comment=Cover (front)");
+    } else if (ext == QLatin1String("m4a") || ext == QLatin1String("mp4")) {
+        args << QStringLiteral("-disposition:v:0") << QStringLiteral("attached_pic");
+    }
+
+    args << tempOut;
+
+    const int exitCode = QProcess::execute(ffmpegExecutable, args);
+    if (exitCode == 0 && QFileInfo(tempOut).size() > 1024) {
+        QFile::remove(audioPath);
+        QFile::rename(tempOut, audioPath);
+    } else {
+        QFile::remove(tempOut);
+    }
+
+    return true;
 }
 
 } // namespace MediaTags

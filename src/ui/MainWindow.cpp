@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "CoverFetchDialog.h"
 #include "pages/AppearancePage.h"
 #include "pages/DiscoverPage.h"
 #include "pages/LibraryPage.h"
@@ -77,6 +78,11 @@ MainWindow::MainWindow(QWidget *parent)
     const int volume = QSettings().value(QStringLiteral("player/volume"), 70).toInt();
     m_audio->setVolume(volume / 100.0);
     m_playerBar->setVolume(volume);
+
+    // Автоповтор плейлиста запоминается между запусками (Issue #13).
+    const bool repeat = QSettings().value(QStringLiteral("player/repeat"), false).toBool();
+    m_playlist->setRepeatEnabled(repeat);
+    m_playerBar->setRepeat(repeat);
 
     applyFrameless(AppearancePage::framelessEnabled());
     updateNavIcons();
@@ -255,6 +261,7 @@ void MainWindow::wireCore()
             m_playlist->removeTrack(row);
     });
     connect(m_library, &LibraryPage::trackActivated, this, &MainWindow::onTrackActivated);
+    connect(m_library, &LibraryPage::fetchCoverRequested, this, &MainWindow::onFetchCoverRequested);
     connect(m_library, &LibraryPage::filesDropped, this, [this](const QStringList &paths) {
         addPaths(paths, true);
     });
@@ -264,6 +271,7 @@ void MainWindow::wireCore()
     connect(m_playerBar, &PlayerBar::stopRequested, this, &MainWindow::onStop);
     connect(m_playerBar, &PlayerBar::nextRequested, this, &MainWindow::onNext);
     connect(m_playerBar, &PlayerBar::previousRequested, this, &MainWindow::onPrevious);
+    connect(m_playerBar, &PlayerBar::repeatToggled, this, &MainWindow::onRepeatToggled);
     connect(m_playerBar, &PlayerBar::seekRequested, this, &MainWindow::onSeek);
     connect(m_playerBar, &PlayerBar::volumeChanged, this, &MainWindow::onVolumeChanged);
 
@@ -271,6 +279,13 @@ void MainWindow::wireCore()
     connect(m_playlist, &Playlist::trackAdded, this, &MainWindow::onPlaylistTrackAdded);
     connect(m_playlist, &Playlist::trackRemoved, this, &MainWindow::onPlaylistTrackRemoved);
     connect(m_playlist, &Playlist::currentTrackChanged, this, &MainWindow::onCurrentTrackChanged);
+    connect(m_playlist, &Playlist::repeatModeChanged, m_playerBar, &PlayerBar::setRepeat);
+    connect(m_playlist, &Playlist::trackCoverUpdated, this, [this](int index) {
+        if (index == m_playingIndex) {
+            const Track track = m_playlist->getTrack(index);
+            m_playerBar->setTrack(track.title, track.artist, track.durationMs, track.cover);
+        }
+    });
     connect(m_playlist, &Playlist::playlistCleared, this, [this]() {
         m_library->clearRows();
         m_media->stop();
@@ -488,6 +503,27 @@ void MainWindow::onVolumeChanged(int value)
     QSettings().setValue(QStringLiteral("player/volume"), value);
 }
 
+void MainWindow::onRepeatToggled(bool enabled)
+{
+    m_playlist->setRepeatEnabled(enabled);
+    QSettings().setValue(QStringLiteral("player/repeat"), enabled);
+    notify(enabled ? tr("Автоповтор плейлиста включён") : tr("Автоповтор плейлиста выключён"));
+}
+
+void MainWindow::onFetchCoverRequested(int row)
+{
+    if (row < 0 || row >= m_playlist->count())
+        return;
+
+    const Track track = m_playlist->getTrack(row);
+    CoverFetchDialog dialog(track.filePath, track.artist, track.title, this);
+    connect(&dialog, &CoverFetchDialog::coverApplied, this, [this, row](const QImage &image) {
+        m_playlist->updateTrackCover(row, image);
+        notify(tr("Фото песни успешно установлено в трек!"));
+    });
+    dialog.exec();
+}
+
 void MainWindow::onPositionChanged(qint64 position)
 {
     m_playerBar->setPosition(position, m_media->duration());
@@ -510,8 +546,12 @@ void MainWindow::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
             break;
         }
         // Автопереход: раньше плейлист останавливался на первом же треке.
+        // Issue #13: автоматический повтор плейлиста.
         if (m_playlist->hasNext()) {
             onNext();
+        } else if (m_playlist->isRepeatEnabled() && m_playlist->count() > 0) {
+            m_playlist->setCurrentIndex(0);
+            onPlay();
         } else {
             m_playerBar->setPlaying(false);
             m_media->stop();

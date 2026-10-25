@@ -30,6 +30,8 @@ public:
     void setPlaying(bool playing);
     void setControlsEnabled(bool enabled);
     void setNavigationEnabled(bool previous, bool next);
+    void setRepeat(bool repeat);
+    bool isRepeat() const { return m_repeatActive; }
     void setVolume(int volume);
     int volume() const;
 
@@ -40,6 +42,7 @@ signals:
     void stopRequested();
     void nextRequested();
     void previousRequested();
+    void repeatToggled(bool active);
     void seekRequested(int positionMs);
     void volumeChanged(int value);
 
@@ -58,10 +61,12 @@ private:
     IconButton *m_playPause = nullptr;
     IconButton *m_stop = nullptr;
     IconButton *m_next = nullptr;
+    IconButton *m_repeat = nullptr;
 
     qint64 m_positionMs = 0;
     qint64 m_durationMs = 0;
     bool m_playing = false;
+    bool m_repeatActive = false;
 };
 
 #endif // PLAYERBAR_H

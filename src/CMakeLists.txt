@@ -7,6 +7,7 @@ set(SOURCES
     core/online/CoverLoader.cpp
     core/player/Playlist.cpp
     core/ytdlp/YtDlp.cpp
+    ui/CoverFetchDialog.cpp
     ui/MainWindow.cpp
     ui/YouTubePanel.cpp
     ui/YtDlpSettingsDialog.cpp
@@ -37,6 +38,7 @@ set(HEADERS
     core/player/Playlist.h
     core/ytdlp/YtDlp.h
     core/ytdlp/YtDlpTypes.h
+    ui/CoverFetchDialog.h
     ui/MainWindow.h
     ui/YouTubePanel.h
     ui/YtDlpSettingsDialog.h

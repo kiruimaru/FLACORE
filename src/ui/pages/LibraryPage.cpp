@@ -9,6 +9,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QMimeData>
 #include <QPushButton>
 #include <QUrl>
@@ -127,6 +128,7 @@ LibraryPage::LibraryPage(QWidget *parent)
     layout->addLayout(header);
 
     m_list = new TrackListWidget(this);
+    m_list->setContextMenuPolicy(Qt::CustomContextMenu);
     m_delegate = new TrackDelegate(m_list);
     m_list->setItemDelegate(m_delegate);
 
@@ -155,8 +157,36 @@ LibraryPage::LibraryPage(QWidget *parent)
         emit trackActivated(m_list->row(item));
     });
     connect(m_list, &TrackListWidget::filesDropped, this, &LibraryPage::filesDropped);
+    connect(m_list, &QListWidget::customContextMenuRequested, this, &LibraryPage::openContextMenuFor);
 
     refreshEmptyState();
+}
+
+void LibraryPage::openContextMenuFor(const QPoint &pos)
+{
+    const int row = m_list->indexAt(pos).row();
+    if (row < 0 || row >= m_list->count())
+        return;
+
+    m_list->setCurrentRow(row);
+    QListWidgetItem *item = m_list->item(row);
+    if (!item)
+        return;
+
+    QMenu menu(this);
+    menu.addAction(tr("▶ Воспроизвести"), this, [this, row]() {
+        emit trackActivated(row);
+    });
+    // Issue #14: подтянуть фото песни из SoundCloud / YouTube
+    menu.addAction(tr("🖼 Подтянуть фото песни (SoundCloud / YouTube)…"), this, [this, row]() {
+        emit fetchCoverRequested(row);
+    });
+    menu.addSeparator();
+    menu.addAction(tr("🗑 Убрать из библиотеки"), this, [this, row]() {
+        emit removeRequested(row);
+    });
+
+    menu.exec(m_list->viewport()->mapToGlobal(pos));
 }
 
 void LibraryPage::addTrack(const QString &title, const QString &artist, const QString &durationText,
