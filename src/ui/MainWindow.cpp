@@ -762,8 +762,16 @@ void MainWindow::applyFrameless(bool frameless)
     const bool visible = isVisible();
     const QRect geometry = this->geometry();
 
-    setWindowFlag(Qt::FramelessWindowHint, frameless);
+    // Issue #7: WA_TranslucentBackground должен быть установлен до изменения
+    // флага окна и до show(), иначе углы не скругляются корректно (особенно
+    // при первом включении режима frameless на Windows).
+    // Сначала скрываем окно — это необходимо для корректного пересоздания
+    // нативного дескриптора окна при изменении флага FramelessWindowHint.
+    if (visible)
+        hide();
+
     setAttribute(Qt::WA_TranslucentBackground, frameless);
+    setWindowFlag(Qt::FramelessWindowHint, frameless);
 
     m_titleBar->setFrameless(frameless);
     m_backdrop->setFramelessMode(frameless);
